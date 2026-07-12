@@ -1,0 +1,530 @@
+{
+  "version": 1,
+  "openApi": "./openapi/incidentbot-openapi.json",
+  "schemas": [
+    {
+      "schema": "InvestigationReport",
+      "contractHash": "sha256:fbcfd394e5e42afd3620b580dd7d14a89501753f40a71e91e3f40728de718f49",
+      "consumers": [
+        {
+          "name": "IncidentReport",
+          "file": "src/features/incidents/IncidentReport.tsx",
+          "fields": [
+            "ai",
+            "causalEvents",
+            "evidence",
+            "links",
+            "problem",
+            "timeline"
+          ]
+        },
+        {
+          "name": "IncidentReportHeader",
+          "file": "src/features/incidents/IncidentReportHeader.tsx",
+          "fields": [
+            "pagerDutyIncidentId",
+            "profileId",
+            "profileRevision",
+            "serviceId",
+            "state",
+            "title",
+            "triggeredAt",
+            "urgency"
+          ]
+        },
+        {
+          "name": "SummaryAndCoverage",
+          "file": "src/report/AnalysisSections.tsx",
+          "fields": [
+            "deterministicSummary",
+            "sources"
+          ]
+        },
+        {
+          "name": "ReportAppHeader",
+          "file": "src/features/incidents/ReportAppHeader.tsx",
+          "fields": [
+            "version"
+          ]
+        },
+        {
+          "name": "useIncidentSession",
+          "file": "src/features/incidents/useIncidentSession.ts",
+          "fields": [
+            "version"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "id": "The incident route already supplies the identifier.",
+        "status": "Collection state is represented through report content and SignalR refreshes.",
+        "updatedAt": "The UI displays the report version instead of the raw update timestamp."
+      }
+    },
+    {
+      "schema": "IncidentPending",
+      "contractHash": "sha256:f580243b08244d9641c5b5d8e49c029bf310295f572881ea2761671e44fac261",
+      "consumers": [
+        {
+          "name": "useIncidentSession",
+          "file": "src/features/incidents/useIncidentSession.ts",
+          "fields": [
+            "version"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "id": "Pending responses are not rendered.",
+        "pagerDutyIncidentId": "Pending responses are not rendered.",
+        "profileId": "Pending responses are not rendered.",
+        "serviceId": "Pending responses are not rendered.",
+        "state": "Pending responses are not rendered.",
+        "status": "Pending responses are not rendered.",
+        "title": "Pending responses are not rendered.",
+        "triggeredAt": "Pending responses are not rendered.",
+        "updatedAt": "Pending responses are not rendered.",
+        "urgency": "Pending responses are not rendered."
+      }
+    },
+    {
+      "schema": "AiSynthesis",
+      "contractHash": "sha256:43af9bd6863d87ebf5d7ff89d4ba83807f225bda7e7de07ee00836bdf20986ca",
+      "consumers": [
+        {
+          "name": "IncidentReport",
+          "file": "src/features/incidents/IncidentReport.tsx",
+          "fields": [
+            "diagnoses",
+            "recommendedChecks"
+          ]
+        },
+        {
+          "name": "SummaryAndCoverage",
+          "file": "src/report/AnalysisSections.tsx",
+          "fields": [
+            "status"
+          ]
+        },
+        {
+          "name": "InlineSummary",
+          "file": "src/report/AnalysisSections.tsx",
+          "fields": [
+            "summary",
+            "summaryParts",
+            "summaryReferences"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "evidenceHash": "Internal synthesis trace metadata is not presented.",
+        "possibleContributors": "The cited diagnoses section supersedes the legacy contributor list.",
+        "unknowns": "Unknowns are retained in the API but not currently presented."
+      }
+    },
+    {
+      "schema": "AiDiagnosis",
+      "contractHash": "sha256:9aaeed3da78f46ada22f6aa4f9bd2776bc5455524afa3fab3d9e91fe54236362",
+      "consumers": [
+        {
+          "name": "CitedDiagnosis",
+          "file": "src/report/AnalysisSections.tsx",
+          "fields": [
+            "codeReferences",
+            "evidenceIds",
+            "evidenceStrength",
+            "rank",
+            "summary"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "AiSummaryPart",
+      "contractHash": "sha256:0fd1a3a95f3ac8ff058d3b6588c9bb3cfa33dec27450ec92a16d8c13ccd35f15",
+      "consumers": [
+        {
+          "name": "InlineSummary",
+          "file": "src/report/AnalysisSections.tsx",
+          "fields": [
+            "referenceId",
+            "text"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "AiSummaryReference",
+      "contractHash": "sha256:2a8cb22b37f57e7aea4b7af2b43673523c8808e2e63f07f62c35508b38bf8a1f",
+      "consumers": [
+        {
+          "name": "InlineSummary",
+          "file": "src/report/AnalysisSections.tsx",
+          "fields": [
+            "href",
+            "id",
+            "kind",
+            "label"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "EvidenceFinding",
+      "contractHash": "sha256:5b5b0bc0c0647640842172565f77295a456298539167542762642e3bd1da6c0f",
+      "consumers": [
+        {
+          "name": "LogErrorSection",
+          "file": "src/report/EvidenceReview.tsx",
+          "fields": [
+            "category",
+            "occurredAt",
+            "source"
+          ]
+        },
+        {
+          "name": "EvidenceCard",
+          "file": "src/report/EvidenceReview.tsx",
+          "fields": [
+            "category",
+            "codeReferences",
+            "confidence",
+            "excerpt",
+            "id",
+            "severity",
+            "source",
+            "summary",
+            "url"
+          ]
+        },
+        {
+          "name": "LogErrorRow",
+          "file": "src/report/EvidenceReview.tsx",
+          "fields": [
+            "id",
+            "objectId",
+            "occurredAt",
+            "summary",
+            "url"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "actor": "Actor metadata is shown only for causal events.",
+        "endedAt": "The current cards show the finding start time only.",
+        "objectType": "The object identifier is sufficient for the log row.",
+        "provenance": "Raw connector provenance is intentionally not exposed in the UI."
+      }
+    },
+    {
+      "schema": "TimelineEvent",
+      "contractHash": "sha256:ccbe10025420d9c7df482e5c5dd2e73ff2d181c517d764e3fc8ba2bf3f5ef449",
+      "consumers": [
+        {
+          "name": "TimelineAndEvidence",
+          "file": "src/report/EvidenceReview.tsx",
+          "fields": [
+            "kind",
+            "occurredAt",
+            "source",
+            "summary"
+          ]
+        },
+        {
+          "name": "TimelineRow",
+          "file": "src/report/EvidenceReview.tsx",
+          "fields": [
+            "occurredAt",
+            "severity",
+            "source",
+            "summary",
+            "url"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "actor": "Actor details are presented in the causal sequence.",
+        "objectId": "Timeline rows intentionally stay compact.",
+        "objectType": "Timeline rows intentionally stay compact."
+      }
+    },
+    {
+      "schema": "SourceReport",
+      "contractHash": "sha256:8242dc3af975e774325651760262d8624df32e77f4eb2ccc5862cb9ca89c9962",
+      "consumers": [
+        {
+          "name": "SourceRow",
+          "file": "src/report/AnalysisSections.tsx",
+          "fields": [
+            "durationMilliseconds",
+            "findingCount",
+            "health",
+            "source"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "diagnostic": "Detailed connector diagnostics are not shown in the compact source row.",
+        "links": "Source links are displayed from the report-level curated link list."
+      }
+    },
+    {
+      "schema": "SourceHealth",
+      "contractHash": "sha256:839baa2b04ede8f1bdbcf13974618a0ff258d6d75199a7f620237be5e134b0ef",
+      "consumers": [
+        {
+          "name": "SourceRow",
+          "file": "src/report/AnalysisSections.tsx",
+          "fields": []
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "ProblemContext",
+      "contractHash": "sha256:a25d95e6e92a12abbfb6a33f4c0362485da984d92298fefc82e4ff388499ab6d",
+      "consumers": [
+        {
+          "name": "RecurrencePanel",
+          "file": "src/report/RecurrencePanel.tsx",
+          "fields": [
+            "availability",
+            "firstSeen",
+            "lastSeen",
+            "lifecycleState",
+            "matchScore",
+            "matchType",
+            "matchedFeatures",
+            "occurrenceCount",
+            "possibleMatches",
+            "problemKey",
+            "recentOccurrences"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "algorithmVersion": "Fingerprint implementation metadata is not user-facing.",
+        "completeness": "Availability and lifecycle state provide the current UI signal.",
+        "diagnostic": "Unavailable state uses a safe generic message.",
+        "problemGroupId": "The stable problem key is displayed instead of the internal GUID.",
+        "stage": "Availability already communicates whether matching is provisional."
+      }
+    },
+    {
+      "schema": "PossibleProblemMatch",
+      "contractHash": "sha256:7870bcee55c3ccc4a567296e5a54fbefa6a170c9ace5d0c658f06d8a876a10d0",
+      "consumers": [
+        {
+          "name": "RelatedMatches",
+          "file": "src/report/RecurrencePanel.tsx",
+          "fields": [
+            "problemKey",
+            "score"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "lastSeen": "The compact related-match chip shows only identity and score.",
+        "matchedFeatures": "Detailed match evidence is reserved for confirmed problem context.",
+        "matchType": "The compact related-match chip shows only identity and score."
+      }
+    },
+    {
+      "schema": "ProblemOccurrence",
+      "contractHash": "sha256:6a6ee4488e7feb5bc86b7ee48f10cab377615437702732ced56fed6d31277a00",
+      "consumers": [
+        {
+          "name": "RecurrencePanel",
+          "file": "src/report/RecurrencePanel.tsx",
+          "fields": [
+            "incidentId",
+            "occurredAt",
+            "pagerDutyIncidentId",
+            "reportUrl",
+            "state"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "updatedAt": "Occurrence cards display when the incident occurred."
+      }
+    },
+    {
+      "schema": "CausalEvent",
+      "contractHash": "sha256:63fb661397262ce45a0f465b587aa58ed5058d642cbb4939b71dcdf68cdf6549",
+      "consumers": [
+        {
+          "name": "CausalEventCard",
+          "file": "src/report/AnalysisSections.tsx",
+          "fields": [
+            "actor",
+            "category",
+            "codeReferences",
+            "id",
+            "label",
+            "occurredAt",
+            "source",
+            "summary",
+            "url"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "evidenceId": "The card links to the source and code references instead.",
+        "objectId": "Object identity is retained in evidence but omitted from the sequence card.",
+        "objectType": "Object identity is retained in evidence but omitted from the sequence card."
+      }
+    },
+    {
+      "schema": "CodeReference",
+      "contractHash": "sha256:1fe6f0df64a2fa21b68b4e8b074527c426b55ef0c0590a800027dd55e2a52264",
+      "consumers": [
+        {
+          "name": "CodeReferenceLink",
+          "file": "src/report/ui.tsx",
+          "fields": [
+            "endLine",
+            "excerpt",
+            "id",
+            "path",
+            "startLine",
+            "url"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "commitSha": "The immutable URL already identifies the commit.",
+        "projectId": "The path and link provide sufficient compact context."
+      }
+    },
+    {
+      "schema": "SourceLink",
+      "contractHash": "sha256:36317dcc611ad6d20aef256f606d2c5bd1ed446fdfc4f7cc46079ee55233e5d5",
+      "consumers": [
+        {
+          "name": "ResponderResources",
+          "file": "src/features/incidents/ResponderResources.tsx",
+          "fields": [
+            "label",
+            "url"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "IncidentState",
+      "contractHash": "sha256:44c2a9b71e4c19b292353231f59d503da81bc8408234742089f3267d4750c900",
+      "consumers": [
+        {
+          "name": "IncidentReportHeader",
+          "file": "src/features/incidents/IncidentReportHeader.tsx",
+          "fields": []
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "ProblemLifecycleState",
+      "contractHash": "sha256:8c154027064aaaaf338d247fff11ef8118c3a707a355c6516ced050257d93343",
+      "consumers": [
+        {
+          "name": "RecurrencePanel",
+          "file": "src/report/RecurrencePanel.tsx",
+          "fields": []
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "DemoAvailability",
+      "contractHash": "sha256:fdf34424530f7fc495d132e94c639a8309f2f0f5b4e24e18d38d6199fbfe2c84",
+      "consumers": [
+        {
+          "name": "useDemoReplay",
+          "file": "src/features/demo/useDemoReplay.ts",
+          "fields": [
+            "incidentUrl"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "enabled": "A successful response already indicates demo availability.",
+        "incidentId": "Navigation uses the server-provided incident URL."
+      }
+    },
+    {
+      "schema": "IncidentUpdated",
+      "contractHash": "sha256:aab6173b652290b1540a8cdb5f70c840477a0450271cd69171322d29e6225e7d",
+      "consumers": [
+        {
+          "name": "useIncidentSession",
+          "file": "src/features/incidents/useIncidentSession.ts",
+          "fields": [
+            "version"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "changedSections": "The client refetches the canonical report instead of patching sections.",
+        "incidentId": "The SignalR connection has already joined one incident group."
+      }
+    },
+    {
+      "schema": "IncidentStatusChanged",
+      "contractHash": "sha256:979fa53265983c2f05944603429694e5a7f08adc47d2dba4b1df5f3406a93196",
+      "consumers": [
+        {
+          "name": "useIncidentSession",
+          "file": "src/features/incidents/useIncidentSession.ts",
+          "fields": []
+        }
+      ],
+      "ignoredFields": {
+        "incidentId": "The SignalR connection has already joined one incident group.",
+        "status": "Any status notification triggers a canonical report refetch.",
+        "version": "Any status notification triggers a canonical report refetch."
+      }
+    }
+  ],
+  "operations": [
+    {
+      "operationId": "GetIncidentReport",
+      "contractHash": "sha256:10bd4b58e5756def24e6be7eef4a34482828004900a6aaf09e36f32055e76c9c",
+      "consumers": [
+        {
+          "name": "useIncidentSession",
+          "file": "src/features/incidents/useIncidentSession.ts",
+          "behavior": "Handles 200, 202, 304, and 404 responses and sends If-None-Match."
+        }
+      ]
+    },
+    {
+      "operationId": "GetDemoAvailability",
+      "contractHash": "sha256:cb61444e70a0c5a2f5fcf909ed009297801a560dbe13421380e584fba63c628d",
+      "consumers": [
+        {
+          "name": "getDemoAvailability",
+          "file": "src/features/demo/demoApi.ts",
+          "behavior": "Fetches demo availability without caching; the landing page only renders the action when a response is available."
+        }
+      ]
+    },
+    {
+      "operationId": "ResetDemo",
+      "contractHash": "sha256:ecf0585e90203aa292642fa43164cc95b74fd52498acf41686a8d9577fafd798",
+      "consumers": [
+        {
+          "name": "resetDemo",
+          "file": "src/features/demo/demoApi.ts",
+          "behavior": "POSTs a reset before either starting or replaying the demo."
+        }
+      ],
+      "ignoredSchemas": {
+        "DemoReset": "The UI checks only whether reset succeeded and does not read the response body."
+      }
+    }
+  ]
+}

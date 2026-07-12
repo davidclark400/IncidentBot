@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: incidentbot
+      POSTGRES_USER: incidentbot
+      POSTGRES_PASSWORD: incidentbot
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U incidentbot -d incidentbot"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - incidentbot-postgres:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__IncidentBot: Host=postgres;Port=5432;Database=incidentbot;Username=incidentbot;Password=incidentbot
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8080/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  incidentbot-postgres:

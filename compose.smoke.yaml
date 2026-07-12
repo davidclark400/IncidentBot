@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: incidentbot_smoke
+      POSTGRES_USER: incidentbot
+      POSTGRES_PASSWORD: incidentbot-smoke-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U incidentbot -d incidentbot_smoke"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  api:
+    build:
+      context: .
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__IncidentBot: Host=postgres;Port=5432;Database=incidentbot_smoke;Username=incidentbot;Password=incidentbot-smoke-only
+      IncidentBot__ProfilesPath: /app/config/smoke-profile.yaml
+      IncidentBot__PublicBaseUrl: https://incident-bot.internal
+      IncidentBot__RequireSlackForReadiness: "false"
+      PagerDuty__RequireSignature: "true"
+      PAGERDUTY_WEBHOOK_SECRET: local-smoke-secret
+      IngressIdentity__Required: "true"
+      Slack__Enabled: "false"
+      LITELLM_API_KEY: local-smoke-key
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./tests/fixtures/smoke-profile.yaml:/app/config/smoke-profile.yaml:ro

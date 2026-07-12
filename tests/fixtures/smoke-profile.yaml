@@ -1,0 +1,9 @@
+version: 1
+revision: "production-smoke-v1"
+fallbackSlackChannel: "#incidentbot-smoke"
+
+profiles:
+  - id: production-smoke
+    pagerDutyServiceId: PSMOKE
+    team: platform
+    slackChannel: "#incidentbot-smoke"

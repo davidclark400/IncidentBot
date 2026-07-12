@@ -1,0 +1,96 @@
+version: 1
+revision: "2026-07-11.1"
+fallbackSlackChannel: "#incident-response"
+
+profiles:
+  - id: payments-production
+    pagerDutyServiceId: P123PAYMENTS
+    team: payments
+    slackChannel: "#payments-incidents"
+    pagerDuty:
+      connector:
+        mode: api
+        baseUrl: https://api.pagerduty.com
+        credentialEnv: PAGERDUTY_API_TOKEN
+        timeoutSeconds: 8
+        maxItems: 10
+        maxBytes: 65536
+
+    nomad:
+      connector:
+        mode: api
+        baseUrl: https://nomad.internal.example
+        credentialEnv: NOMAD_TOKEN
+        timeoutSeconds: 12
+        maxItems: 50
+        maxBytes: 131072
+      region: global
+      namespaces:
+        - name: payments-production
+          jobs:
+            - payments-api
+            - payments-worker
+
+    gitLab:
+      connector:
+        mode: api
+        baseUrl: https://gitlab.internal.example
+        credentialEnv: GITLAB_READ_TOKEN
+        timeoutSeconds: 12
+        maxItems: 30
+        maxBytes: 196608
+      projects:
+        - id: platform/payments
+          branch: main
+          environments:
+            - production
+          relevantPaths:
+            - src/Payments.Api
+            - deploy/nomad
+
+    grafana:
+      connector:
+        mode: api
+        baseUrl: https://grafana.internal.example
+        credentialEnv: GRAFANA_SERVICE_TOKEN
+        timeoutSeconds: 12
+        maxItems: 50
+        maxBytes: 262144
+      organizationId: 1
+      annotationTags:
+        - payments
+        - production
+      dashboards:
+        - uid: payments-overview
+          panelIds: [2, 7, 12]
+      queries:
+        - name: HTTP 5xx rate
+          datasourceUid: prometheus-production
+          expression: 'sum(rate(http_requests_total{service="payments-api",environment="{{environment}}",status=~"5.."}[5m]))'
+          warningAbove: 1
+        - name: p99 latency
+          datasourceUid: prometheus-production
+          expression: 'histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{service="payments-api",environment="{{environment}}"}[5m])))'
+          warningAbove: 1.5
+
+    victoriaLogs:
+      connector:
+        mode: api
+        baseUrl: https://victorialogs.internal.example
+        credentialEnv: VICTORIALOGS_TOKEN
+        timeoutSeconds: 12
+        maxItems: 30
+        maxBytes: 196608
+      accountId: "1"
+      projectId: "20"
+      streamFilters:
+        namespace: payments-production
+        service: payments-api
+      fields: [_time, level, service, allocation_id, _msg]
+      queries:
+        - name: Errors
+          expression: 'level:in(error, fatal) service:="payments-api"'
+        - name: Panics and timeouts
+          expression: 'service:="payments-api" (panic OR timeout)'
+      redactPatterns:
+        - '(?i)(authorization|token|password)[=: ]+[^ ,}]+'

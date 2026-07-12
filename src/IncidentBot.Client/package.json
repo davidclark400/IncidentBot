@@ -1,0 +1,36 @@
+{
+  "name": "incidentbot-client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "contracts:generate": "openapi-ts",
+    "contracts:check": "node ./scripts/check-generated-contracts.mjs && npm run ui-contracts:check",
+    "ui-contracts:check": "node ./scripts/ui-contract-map.mjs",
+    "ui-contracts:update": "node ./scripts/ui-contract-map.mjs --update",
+    "build": "npm run contracts:generate && npm run ui-contracts:check && tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@microsoft/signalr": "^9.0.6",
+    "motion": "^12.42.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@tailwindcss/vite": "^4.3.2",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "@hey-api/openapi-ts": "0.99.0",
+    "oxlint": "^1.71.0",
+    "tailwindcss": "^4.3.2",
+    "typescript": "~5.9.3",
+    "vite": "^8.1.1"
+  }
+}
