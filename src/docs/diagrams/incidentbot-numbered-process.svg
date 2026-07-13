@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" style="max-width: 100%; height: auto;">
+  <title>IncidentBot flow diagram</title>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#475569"/>
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <polyline points="390,270 450,270" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="770,270 830,270" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="1150,270 1210,270" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="1370,350 1370,520" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="1210,600 1150,600" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="830,600 770,600" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="450,600 390,600" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+  <g>
+  <rect x="40" y="30" width="1520" height="90" rx="14" fill="#172554" stroke="#172554" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#ffffff" text-anchor="middle"><tspan x="800" y="85.2">IncidentBot process — document section map</tspan></text>
+</g>
+<g>
+  <rect x="70" y="190" width="320" height="160" rx="14" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="230" y="250.89">1. Trigger intake &amp; scheduling</tspan><tspan x="230" y="277.14"></tspan><tspan x="230" y="303.39">Validate • dedupe • enqueue</tspan></text>
+</g>
+<g>
+  <rect x="450" y="190" width="320" height="160" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="610" y="250.89">2. Investigation orchestration</tspan><tspan x="610" y="277.14"></tspan><tspan x="610" y="303.39">Load • fingerprint • collect</tspan></text>
+</g>
+<g>
+  <rect x="830" y="190" width="320" height="160" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="990" y="239.3">3. Evidence source searches</tspan><tspan x="990" y="264.3"></tspan><tspan x="990" y="289.3">PagerDuty • Nomad • GitLab</tspan><tspan x="990" y="314.3">Grafana • VictoriaLogs</tspan></text>
+</g>
+<g>
+  <rect x="1210" y="190" width="320" height="160" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="1370" y="239.3">4. Prepare evidence for AI</tspan><tspan x="1370" y="264.3"></tspan><tspan x="1370" y="289.3">Dedupe • rank</tspan><tspan x="1370" y="314.3">Bound • synthesize</tspan></text>
+</g>
+<g>
+  <rect x="1210" y="520" width="320" height="160" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="1370" y="580.89">5. Compose report &amp; recurrence</tspan><tspan x="1370" y="607.14"></tspan><tspan x="1370" y="633.39">Project • match • version</tspan></text>
+</g>
+<g>
+  <rect x="830" y="520" width="320" height="160" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="990" y="569.3">6. Commit PostgreSQL writes</tspan><tspan x="990" y="594.3"></tspan><tspan x="990" y="619.3">Report • evidence</tspan><tspan x="990" y="644.3">Timeline • outbox</tspan></text>
+</g>
+<g>
+  <rect x="450" y="520" width="320" height="160" rx="14" fill="#cffafe" stroke="#0891b2" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="610" y="581.8">7. Publish web &amp; Slack output</tspan><tspan x="610" y="606.8"></tspan><tspan x="610" y="631.8">SignalR • post/update • restart</tspan></text>
+</g>
+<g>
+  <rect x="70" y="520" width="320" height="160" rx="14" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="230" y="580.89">8. Apply failure semantics</tspan><tspan x="230" y="607.14"></tspan><tspan x="230" y="633.39">Degrade safely • retry durably</tspan></text>
+</g>
+<g>
+  <rect x="220" y="780" width="1160" height="70" rx="14" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="800" y="821.46">Follow the arrows; each number links conceptually to the matching section below.</tspan></text>
+</g>
+</svg>
