@@ -91,6 +91,7 @@ public static class PagerDutyWebhookEndpoints
         var urgency = OptionalString(data, "urgency") ?? "unknown";
         var htmlUrl = OptionalString(data, "html_url");
         var occurredAt = DateTimeOffset.Parse(RequiredString(eventElement, "occurred_at"));
+        var triggeredAt = OptionalTimestamp(data, "created_at") ?? occurredAt;
         var labels = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["service"] = serviceId
@@ -114,7 +115,7 @@ public static class PagerDutyWebhookEndpoints
         }
 
         return new PagerDutyWebhookEvent(
-            eventId, eventType, incidentId, serviceId, title, urgency, htmlUrl, occurredAt, labels);
+            eventId, eventType, incidentId, serviceId, title, urgency, htmlUrl, triggeredAt, occurredAt, labels);
     }
 
     internal static async Task<byte[]?> ReadBoundedPayloadAsync(
@@ -147,5 +148,11 @@ public static class PagerDutyWebhookEndpoints
     private static string? OptionalString(JsonElement element, string name) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString()
+            : null;
+
+    private static DateTimeOffset? OptionalTimestamp(JsonElement element, string name) =>
+        OptionalString(element, name) is { } value
+        && DateTimeOffset.TryParse(value, out var timestamp)
+            ? timestamp.ToUniversalTime()
             : null;
 }

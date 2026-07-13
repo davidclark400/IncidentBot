@@ -1,5 +1,6 @@
 using IncidentBot.Api.Connectors;
 using IncidentBot.Api.Domain;
+using IncidentBot.Api.Options;
 
 namespace IncidentBot.Api.Tests;
 

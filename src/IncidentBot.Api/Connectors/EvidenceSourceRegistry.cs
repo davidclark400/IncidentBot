@@ -1,4 +1,5 @@
 using IncidentBot.Api.Domain;
+using IncidentBot.Api.Options;
 
 namespace IncidentBot.Api.Connectors;
 
@@ -12,17 +13,21 @@ public sealed class EvidenceSourceRegistry
 
     private static readonly EvidenceSourceDefinition[] Definitions =
     [
-        new(PagerDuty, profile => profile.PagerDuty?.Connector),
-        new(Nomad, profile => profile.Nomad?.Connector),
-        new(GitLab, profile => profile.GitLab?.Connector),
-        new(Grafana, profile => profile.Grafana?.Connector),
-        new(VictoriaLogs, profile => profile.VictoriaLogs?.Connector)
+        new(PagerDuty, profile => profile.PagerDuty is not null),
+        new(Nomad, profile => profile.Nomad is not null),
+        new(GitLab, profile => profile.GitLab is not null),
+        new(Grafana, profile => profile.Grafana is not null),
+        new(VictoriaLogs, profile => profile.VictoriaLogs is not null)
     ];
 
     private readonly IReadOnlyDictionary<string, IIncidentEvidenceConnector> connectors;
+    private readonly EvidenceSourceConfiguration configuration;
 
-    public EvidenceSourceRegistry(IEnumerable<IIncidentEvidenceConnector> connectors)
+    public EvidenceSourceRegistry(
+        IEnumerable<IIncidentEvidenceConnector> connectors,
+        EvidenceSourceConfiguration configuration)
     {
+        this.configuration = configuration;
         var registered = connectors.ToArray();
         var duplicate = registered.GroupBy(connector => connector.Source, StringComparer.Ordinal)
             .FirstOrDefault(group => group.Count() > 1);
@@ -41,7 +46,7 @@ public sealed class EvidenceSourceRegistry
     }
 
     public IReadOnlyList<string> EnabledSources(InvestigationProfile profile) =>
-        Definitions.Where(definition => definition.Transport(profile) is not null)
+        Definitions.Where(definition => definition.Enabled(profile))
             .Select(definition => definition.Source)
             .ToArray();
 
@@ -54,13 +59,12 @@ public sealed class EvidenceSourceRegistry
 
     public IEnumerable<(string Source, ConnectorTransport Transport)> ConfiguredTransports(
         InvestigationProfile profile) =>
-        Definitions.Select(definition => (definition.Source, Transport: definition.Transport(profile)))
-            .Where(value => value.Transport is not null)
-            .Select(value => (value.Source, value.Transport!));
+        Definitions.Where(definition => definition.Enabled(profile))
+            .Select(definition => (definition.Source, configuration.For(definition.Source)));
 
     private sealed record EvidenceSourceDefinition(
         string Source,
-        Func<InvestigationProfile, ConnectorTransport?> Transport);
+        Func<InvestigationProfile, bool> Enabled);
 }
 
 public static class EvidenceSourceRegistration

@@ -324,6 +324,7 @@ public sealed class PostgresFingerprintingTests(PostgresFixture database) : IAsy
         "high",
         "https://pagerduty.example/incidents/PD-WEBHOOK-1",
         DateTimeOffset.UtcNow,
+        DateTimeOffset.UtcNow,
         new Dictionary<string, string> { ["environment"] = "production" });
 
     private static InvestigationProfile Profile() => new()

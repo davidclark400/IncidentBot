@@ -13,6 +13,7 @@ public sealed class DataSourceConnectivityChecker(
     InvestigationProfileStore profiles,
     McpStreamableHttpClient mcp,
     IOptions<IncidentBotOptions> options,
+    ICredentialProvider credentials,
     ILogger<DataSourceConnectivityChecker> logger) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -75,7 +76,8 @@ public sealed class DataSourceConnectivityChecker(
             using var request = ConnectorUtilities.CreateRequest(
                 HttpMethod.Get,
                 ConnectorUtilities.Url(source.Transport, path),
-                source.Transport);
+                source.Transport,
+                credentials);
             ApplySourceAuthentication(request, source.Source, source.Transport);
             using var response = await httpClientFactory.CreateClient().SendAsync(
                 request,
@@ -140,14 +142,14 @@ public sealed class DataSourceConnectivityChecker(
         _ => ""
     };
 
-    private static void ApplySourceAuthentication(
+    private void ApplySourceAuthentication(
         HttpRequestMessage request,
         string source,
         ConnectorTransport transport)
     {
         var credential = string.IsNullOrWhiteSpace(transport.CredentialEnv)
             ? null
-            : Environment.GetEnvironmentVariable(transport.CredentialEnv);
+            : credentials.Get(transport.CredentialEnv);
 
         if (source == EvidenceSourceRegistry.PagerDuty)
         {

@@ -166,7 +166,8 @@ public sealed class EvidenceRankingPolicyTests
                 TriggeredAt.AddSeconds(index), $"Job {index} failed", .95, "42"))
             .ToList();
         var sources = new IncidentBot.Api.Connectors.EvidenceSourceRegistry(
-            Array.Empty<IncidentBot.Api.Connectors.IIncidentEvidenceConnector>());
+            Array.Empty<IncidentBot.Api.Connectors.IIncidentEvidenceConnector>(),
+            TestConfiguration.EvidenceSources());
         var composer = new ReportComposer(TimeProvider.System, sources);
         var incident = new IncidentRecord(
             Guid.NewGuid(), "PD-1", "payments", "profile", "Payments failing", "high",

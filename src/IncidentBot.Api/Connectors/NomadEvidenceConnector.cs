@@ -1,21 +1,27 @@
 using System.Text.Json;
 using IncidentBot.Api.Domain;
 using IncidentBot.Api.Incidents;
+using IncidentBot.Api.Infrastructure;
+using IncidentBot.Api.Options;
 
 namespace IncidentBot.Api.Connectors;
 
 public sealed class NomadEvidenceConnector(
     IHttpClientFactory httpClientFactory,
-    IMcpEvidenceAdapter mcp) : IIncidentEvidenceConnector
+    IMcpEvidenceAdapter mcp,
+    EvidenceSourceConfiguration evidenceSources,
+    ICredentialProvider credentials) : IIncidentEvidenceConnector
 {
     public string Source => EvidenceSourceRegistry.Nomad;
+    public bool SupportsWindowExpansion => false;
 
     public Task<ConnectorResult> CollectAsync(InvestigationContext context, EvidenceScope scope, CancellationToken cancellationToken)
     {
         var configuration = context.Profile.Nomad;
         if (configuration is null) return Task.FromResult(ConnectorResult.Excluded(Source));
+        var transport = evidenceSources.For(Source);
         return ConnectorUtilities.CollectAsync(
-            Source, configuration.Connector, mcp, context, scope,
+            Source, transport, mcp, context, scope,
             new
             {
                 configuration.Region,
@@ -27,7 +33,7 @@ public sealed class NomadEvidenceConnector(
             var links = new List<SourceLink>();
             var sourceMaximumItems = Math.Min(
                 Math.Max(0, scope.MaxItems),
-                Math.Max(0, configuration.Connector.MaxItems));
+                Math.Max(0, transport.MaxItems));
             var candidateLimit = Math.Max(
                 sourceMaximumItems,
                 Math.Min(Math.Max(0, scope.MaxItems) * 4, 400));
@@ -42,13 +48,13 @@ public sealed class NomadEvidenceConnector(
                         job,
                         encodedJob,
                         query,
-                        ConnectorUtilities.Url(configuration.Connector, $"v1/job/{encodedJob}?{query}"));
+                        ConnectorUtilities.Url(transport, $"v1/job/{encodedJob}?{query}"));
                 }))
                 .Take(candidateLimit)
                 .ToList();
             var budget = new ConnectorByteBudget(
                 scope.MaxBytes,
-                configuration.Connector.MaxBytes,
+                transport.MaxBytes,
                 jobs.Count * 4);
             var client = httpClientFactory.CreateClient();
 
@@ -63,8 +69,8 @@ public sealed class NomadEvidenceConnector(
                 try
                 {
                     using var jobRequest = ConnectorUtilities.CreateRequest(
-                        HttpMethod.Get, job.Url, configuration.Connector);
-                    SetNomadToken(jobRequest, configuration.Connector);
+                        HttpMethod.Get, job.Url, transport, credentials);
+                    SetNomadToken(jobRequest, transport, credentials);
                     using var jobResponse = await client.SendAsync(
                         jobRequest, HttpCompletionOption.ResponseHeadersRead, ct);
                     using var jobJson = await ConnectorUtilities.ReadBoundedJsonAsync(
@@ -98,7 +104,7 @@ public sealed class NomadEvidenceConnector(
             foreach (var job in jobs)
             {
                 var allocationsUrl = ConnectorUtilities.Url(
-                    configuration.Connector,
+                    transport,
                     $"v1/job/{job.EncodedName}/allocations?{job.Query}&all=true");
                 var operation = $"GET /v1/job/{{id}}/allocations ({job.Namespace}/{job.Name})";
                 var allowance = budget.BeginOperation(operation);
@@ -106,8 +112,8 @@ public sealed class NomadEvidenceConnector(
                 try
                 {
                     using var allocationRequest = ConnectorUtilities.CreateRequest(
-                        HttpMethod.Get, allocationsUrl, configuration.Connector);
-                    SetNomadToken(allocationRequest, configuration.Connector);
+                        HttpMethod.Get, allocationsUrl, transport, credentials);
+                    SetNomadToken(allocationRequest, transport, credentials);
                     using var allocationResponse = await client.SendAsync(
                         allocationRequest, HttpCompletionOption.ResponseHeadersRead, ct);
                     using var allocationJson = await ConnectorUtilities.ReadBoundedJsonAsync(
@@ -115,7 +121,7 @@ public sealed class NomadEvidenceConnector(
                         budget.SafeReadLimit(allowance, allocationResponse.Content),
                         ct,
                         budget.ObserveBytesRead);
-                    foreach (var allocation in allocationJson.RootElement.EnumerateArray().Take(configuration.Connector.MaxItems))
+                    foreach (var allocation in allocationJson.RootElement.EnumerateArray().Take(transport.MaxItems))
                     {
                         var clientStatus = ConnectorUtilities.Text(allocation, "ClientStatus");
                         if (clientStatus is "running" or "complete") continue;
@@ -145,15 +151,15 @@ public sealed class NomadEvidenceConnector(
             {
                 foreach (var job in jobs)
                 {
-                    var operationUrl = ConnectorUtilities.Url(configuration.Connector,
+                    var operationUrl = ConnectorUtilities.Url(transport,
                         $"v1/job/{job.EncodedName}/{operationName}?{job.Query}");
                     var operation = $"GET /v1/job/{{id}}/{operationName} ({job.Namespace}/{job.Name})";
                     var allowance = budget.BeginOperation(operation);
                     if (allowance <= 0) continue;
                     try
                     {
-                        using var operationRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, operationUrl, configuration.Connector);
-                        SetNomadToken(operationRequest, configuration.Connector);
+                        using var operationRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, operationUrl, transport, credentials);
+                        SetNomadToken(operationRequest, transport, credentials);
                         using var operationResponse = await client.SendAsync(
                             operationRequest, HttpCompletionOption.ResponseHeadersRead, ct);
                         using var operationJson = await ConnectorUtilities.ReadBoundedJsonAsync(
@@ -161,7 +167,7 @@ public sealed class NomadEvidenceConnector(
                             budget.SafeReadLimit(allowance, operationResponse.Content),
                             ct,
                             budget.ObserveBytesRead);
-                        foreach (var item in operationJson.RootElement.EnumerateArray().Take(configuration.Connector.MaxItems))
+                        foreach (var item in operationJson.RootElement.EnumerateArray().Take(transport.MaxItems))
                         {
                             var itemId = ConnectorUtilities.Text(item, "ID");
                             var itemStatus = ConnectorUtilities.Text(item, "Status");
@@ -212,10 +218,13 @@ public sealed class NomadEvidenceConnector(
         }, cancellationToken);
     }
 
-    private static void SetNomadToken(HttpRequestMessage request, ConnectorTransport transport)
+    private static void SetNomadToken(
+        HttpRequestMessage request,
+        ConnectorTransport transport,
+        ICredentialProvider credentials)
     {
         request.Headers.Authorization = null;
-        var token = Environment.GetEnvironmentVariable(transport.CredentialEnv);
+        var token = credentials.Get(transport.CredentialEnv);
         if (!string.IsNullOrWhiteSpace(token)) request.Headers.TryAddWithoutValidation("X-Nomad-Token", token);
     }
 

@@ -3,12 +3,16 @@ import { expect, test } from '@playwright/test'
 test('demo completes the first-run investigation workflow', async ({ page }) => {
   await page.goto('/')
 
-  await expect(page.getByRole('heading', { name: /Live operational context/ })).toBeVisible()
-  await page.getByRole('button', { name: 'Run live demo' }).click()
+  await expect(page.getByRole('heading', { name: 'Recent incidents' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'PagerDuty incidents' })).toBeVisible()
+  await expect(page.getByText('Payment authorisations timing out')).toBeVisible()
+  await page.getByRole('button', { name: 'Investigate' }).click()
 
   await expect(page).toHaveURL(/\/incidents\/11111111-1111-1111-1111-111111111111$/)
   await expect(page.getByRole('heading', { name: 'Payment authorisations timing out' })).toBeVisible()
   await expect(page.getByText('PDEMO')).toBeVisible()
+  await expect(page.getByText('Requested', { exact: true }).first()).toBeVisible()
+  await expect(page.locator('[data-source-request][data-request-state="requested"]').first()).toBeVisible()
   await expect(page.getByText('PAYMENTS-CHECKOUT-4F19')).toBeVisible({ timeout: 15_000 })
   await expect(page.getByRole('heading', { name: '4 occurrences' })).toBeVisible()
   await expect(page.getByText('90% similarity match')).toBeVisible()
@@ -16,6 +20,8 @@ test('demo completes the first-run investigation workflow', async ({ page }) => 
   await expect(page.getByRole('heading', { name: 'Model assessment tied to collected evidence' })).toBeVisible({ timeout: 15_000 })
   await expect(page.getByText('AI synthesis: complete. Deterministic evidence remains canonical.')).toBeVisible()
   await expect(page.getByText('5/5')).toBeVisible()
+  await expect(page.getByText('All source requests received')).toBeVisible()
+  await expect(page.locator('[data-source-request]')).toHaveCount(0)
   await expect(page.getByRole('link', { name: /Handler\.cs:L43-44/ }).first()).toBeVisible()
 })
 
@@ -30,7 +36,8 @@ test('unknown incident exposes a recoverable error state', async ({ page }) => {
 test('mobile responders can reach the timeline without horizontal overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
-  await page.getByRole('button', { name: 'Run live demo' }).click()
+  await expect(page.getByText('Payment authorisations timing out')).toBeVisible()
+  await page.getByRole('button', { name: 'Investigate' }).click()
 
   await expect(page.getByRole('heading', { name: 'Payment authorisations timing out' })).toBeVisible()
   const sectionNav = page.getByRole('navigation', { name: 'Report sections' })

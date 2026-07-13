@@ -1,11 +1,14 @@
 using System.Security.Cryptography;
 using System.Text;
+using IncidentBot.Api.Infrastructure;
 using IncidentBot.Api.Options;
 using Microsoft.Extensions.Options;
 
 namespace IncidentBot.Api.Security;
 
-public sealed class PagerDutySignatureValidator(IOptions<PagerDutyOptions> options)
+public sealed class PagerDutySignatureValidator(
+    IOptions<PagerDutyOptions> options,
+    ICredentialProvider credentials)
 {
     public bool Validate(ReadOnlySpan<byte> payload, string? signatureHeader)
     {
@@ -14,7 +17,7 @@ public sealed class PagerDutySignatureValidator(IOptions<PagerDutyOptions> optio
             return true;
         }
 
-        var secret = Environment.GetEnvironmentVariable(options.Value.WebhookSecretEnv);
+        var secret = credentials.Get(options.Value.WebhookSecretEnv);
         if (string.IsNullOrWhiteSpace(secret) || string.IsNullOrWhiteSpace(signatureHeader))
         {
             return false;

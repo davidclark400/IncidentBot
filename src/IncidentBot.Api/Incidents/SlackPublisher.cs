@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using IncidentBot.Api.Domain;
+using IncidentBot.Api.Infrastructure;
 using IncidentBot.Api.Options;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
@@ -14,6 +15,7 @@ public sealed class SlackPublisher(
     IIncidentStore repository,
     IOptions<SlackOptions> slackOptions,
     IOptions<IncidentBotOptions> botOptions,
+    ICredentialProvider credentials,
     TimeProvider timeProvider,
     ILogger<SlackPublisher> logger)
 {
@@ -31,7 +33,7 @@ public sealed class SlackPublisher(
             ?? throw new InvalidOperationException($"Slack incident '{incidentId}' was not found.");
         var report = await repository.GetReportAsync(incidentId, cancellationToken)
             ?? throw new InvalidOperationException($"Slack report '{incidentId}' was not found.");
-        var token = Environment.GetEnvironmentVariable(slackOptions.Value.BotTokenEnv);
+        var token = credentials.Get(slackOptions.Value.BotTokenEnv);
         if (string.IsNullOrWhiteSpace(token))
         {
             throw new InvalidOperationException($"Slack token environment variable '{slackOptions.Value.BotTokenEnv}' is missing.");

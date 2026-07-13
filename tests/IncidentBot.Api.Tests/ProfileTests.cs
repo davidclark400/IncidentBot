@@ -4,6 +4,7 @@ using IncidentBot.Api.Domain;
 using IncidentBot.Api.Connectors;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.FileProviders;
+using YamlDotNet.Core;
 
 namespace IncidentBot.Api.Tests;
 
@@ -45,6 +46,103 @@ public sealed class ProfileTests
             ["gitlab", "grafana", "nomad", "pagerduty", "victorialogs"],
             sources.Select(source => source.Source));
         Assert.All(sources, source => Assert.Equal(["payments-production"], source.ProfileIds));
+    }
+
+    [Fact]
+    public void ExampleProfile_UsesApplicationLevelTransportConfiguration()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "config", "investigation-profiles.yaml");
+        var store = new InvestigationProfileStore(
+            Microsoft.Extensions.Options.Options.Create(new IncidentBotOptions { ProfilesPath = path }),
+            new TestEnvironment(),
+            EmptySources());
+
+        var source = Assert.Single(
+            store.ConfiguredEvidenceSources(),
+            configured => configured.Source == EvidenceSourceRegistry.Nomad);
+
+        Assert.Equal("https://nomad.internal.example", source.Transport.BaseUrl);
+        Assert.Null(typeof(NomadScope).GetProperty("Connector"));
+    }
+
+    [Fact]
+    public void ProfileConnectorOverride_IsRejected()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"incidentbot-profile-{Guid.NewGuid():N}.yaml");
+        File.WriteAllText(path, """
+            version: 2
+            revision: test-v2
+            fallbackSlackChannel: "#incidents"
+            profiles:
+              - id: payments
+                pagerDutyServiceId: P123
+                team: payments
+                slackChannel: "#payments-incidents"
+                nomad:
+                  connector:
+                    baseUrl: https://wrong.example
+                  namespaces:
+                    - name: production
+                      jobs: [payments]
+            """);
+        try
+        {
+            Assert.Throws<YamlException>(() => new InvestigationProfileStore(
+                Microsoft.Extensions.Options.Options.Create(new IncidentBotOptions { ProfilesPath = path }),
+                new TestEnvironment(),
+                EmptySources()));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(DocumentsMissingRequiredMetadata))]
+    public void RequiredProfileMetadata_CannotBeOmitted(string yaml)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"incidentbot-profile-{Guid.NewGuid():N}.yaml");
+        File.WriteAllText(path, yaml);
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() => new InvestigationProfileStore(
+                Microsoft.Extensions.Options.Options.Create(new IncidentBotOptions { ProfilesPath = path }),
+                new TestEnvironment(),
+                EmptySources()));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    public static IEnumerable<object[]> DocumentsMissingRequiredMetadata()
+    {
+        yield return
+        [
+            """
+            revision: test-v2
+            fallbackSlackChannel: "#incidents"
+            profiles: []
+            """
+        ];
+        yield return
+        [
+            """
+            version: 2
+            fallbackSlackChannel: "#incidents"
+            profiles: []
+            """
+        ];
+        yield return
+        [
+            """
+            version: 2
+            revision: test-v2
+            profiles: []
+            """
+        ];
     }
 
     [Fact]
@@ -108,5 +206,23 @@ public sealed class ProfileTests
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 
-    private static EvidenceSourceRegistry EmptySources() => new(Array.Empty<IIncidentEvidenceConnector>());
+    private static EvidenceSourceRegistry EmptySources() => new(
+        Array.Empty<IIncidentEvidenceConnector>(),
+        new EvidenceSourceConfiguration(Microsoft.Extensions.Options.Options.Create(EvidenceSources())));
+
+    private static EvidenceSourceOptions EvidenceSources() => new()
+    {
+        PagerDuty = Transport("https://api.pagerduty.com", "PAGERDUTY_API_TOKEN"),
+        Nomad = Transport("https://nomad.internal.example", "NOMAD_TOKEN"),
+        GitLab = Transport("https://gitlab.internal.example", "GITLAB_READ_TOKEN"),
+        Grafana = Transport("https://grafana.internal.example", "GRAFANA_SERVICE_TOKEN"),
+        VictoriaLogs = Transport("https://victorialogs.internal.example", "VICTORIALOGS_TOKEN")
+    };
+
+    private static ConnectorTransport Transport(string baseUrl, string credentialEnv) => new()
+    {
+        Mode = "api",
+        BaseUrl = baseUrl,
+        CredentialEnv = credentialEnv
+    };
 }

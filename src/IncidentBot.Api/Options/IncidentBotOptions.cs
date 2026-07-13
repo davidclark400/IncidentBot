@@ -12,6 +12,8 @@ public sealed class IncidentBotOptions
     public string PublicBaseUrl { get; init; } = "http://localhost:5173";
     [Range(1, 240)]
     public int EvidenceWindowMinutes { get; init; } = 30;
+    [Range(1, 1440)]
+    public int EvidenceMaximumWindowMinutes { get; init; } = 240;
     [Range(25, 1000)]
     public int EvidenceMaximumItems { get; init; } = 250;
     [Range(65536, 4194304)]
@@ -52,12 +54,16 @@ public sealed class PagerDutyOptions
     public const string SectionName = "PagerDuty";
     [Required]
     public string WebhookSecretEnv { get; init; } = "PAGERDUTY_WEBHOOK_SECRET";
-    [Required]
-    public string ApiTokenEnv { get; init; } = "PAGERDUTY_API_TOKEN";
-    [Required, Url]
-    public string ApiBaseUrl { get; init; } = "https://api.pagerduty.com";
     [Range(1024, 1048576)]
     public int MaximumWebhookPayloadBytes { get; init; } = 262144;
+    [Range(1, 120)]
+    public int PullTimeoutSeconds { get; init; } = 15;
+    [Range(65536, 4194304)]
+    public int MaximumApiResponseBytes { get; init; } = 1048576;
+    [Range(1, 100)]
+    public int MaximumRecentIncidents { get; init; } = 100;
+    [Range(1, 90)]
+    public int MaximumLookbackDays { get; init; } = 30;
     public bool RequireSignature { get; init; } = true;
 }
 

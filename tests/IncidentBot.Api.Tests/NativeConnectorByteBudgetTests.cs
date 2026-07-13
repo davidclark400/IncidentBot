@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using IncidentBot.Api.Connectors;
 using IncidentBot.Api.Domain;
+using IncidentBot.Api.Options;
 using IncidentBot.Api.Security;
 
 namespace IncidentBot.Api.Tests;
@@ -63,12 +64,12 @@ public sealed class NativeConnectorByteBudgetTests
                     {"results":{"B":{"frames":[{"schema":{"fields":[{"type":"number"}]},"data":{"values":[[7]]}}]}}}
                     """);
         });
+        var transport = Transport("https://grafana.example", maxBytes: 5000);
         var profile = new InvestigationProfile
         {
             Id = "profile",
             Grafana = new GrafanaScope
             {
-                Connector = Transport("https://grafana.example", maxBytes: 5000),
                 Queries =
                 [
                     new GrafanaQuery
@@ -88,7 +89,8 @@ public sealed class NativeConnectorByteBudgetTests
             }
         };
         var connector = new GrafanaEvidenceConnector(
-            new StubHttpClientFactory(handler), new ThrowingMcpAdapter(), new SafeTemplateRenderer());
+            new StubHttpClientFactory(handler), new ThrowingMcpAdapter(), new SafeTemplateRenderer(),
+            TestConfiguration.EvidenceSources(grafana: transport), TestConfiguration.Credentials());
 
         var result = await connector.CollectAsync(
             Context(profile), Scope(maxBytes: 500), CancellationToken.None);
@@ -121,12 +123,12 @@ public sealed class NativeConnectorByteBudgetTests
                 "{\"_time\":\"2026-07-11T10:01:00Z\",\"_msg\":\"retained failure\"}",
                 "application/x-ndjson");
         });
+        var transport = Transport("https://logs.example", maxBytes: 5000);
         var profile = new InvestigationProfile
         {
             Id = "profile",
             VictoriaLogs = new VictoriaLogsScope
             {
-                Connector = Transport("https://logs.example", maxBytes: 5000),
                 Queries =
                 [
                     new VictoriaLogsQuery { Name = "oversized", Expression = "oversized" },
@@ -135,7 +137,8 @@ public sealed class NativeConnectorByteBudgetTests
             }
         };
         var connector = new VictoriaLogsEvidenceConnector(
-            new StubHttpClientFactory(handler), new ThrowingMcpAdapter(), new SafeTemplateRenderer());
+            new StubHttpClientFactory(handler), new ThrowingMcpAdapter(), new SafeTemplateRenderer(),
+            TestConfiguration.EvidenceSources(victoriaLogs: transport), TestConfiguration.Credentials());
 
         var result = await connector.CollectAsync(
             Context(profile), Scope(maxBytes: 600), CancellationToken.None);
@@ -172,12 +175,12 @@ public sealed class NativeConnectorByteBudgetTests
 
             return Json("[]");
         });
+        var transport = Transport("https://nomad.example", maxBytes: 5000);
         var profile = new InvestigationProfile
         {
             Id = "profile",
             Nomad = new NomadScope
             {
-                Connector = Transport("https://nomad.example", maxBytes: 5000),
                 Namespaces =
                 [
                     new NomadNamespace { Name = "production", Jobs = ["one", "two"] }
@@ -185,7 +188,8 @@ public sealed class NativeConnectorByteBudgetTests
             }
         };
         var connector = new NomadEvidenceConnector(
-            new StubHttpClientFactory(handler), new ThrowingMcpAdapter());
+            new StubHttpClientFactory(handler), new ThrowingMcpAdapter(),
+            TestConfiguration.EvidenceSources(nomad: transport), TestConfiguration.Credentials());
 
         var result = await connector.CollectAsync(
             Context(profile), Scope(maxBytes: 1200), CancellationToken.None);
@@ -211,16 +215,15 @@ public sealed class NativeConnectorByteBudgetTests
             Interlocked.Increment(ref calls);
             return Text(new string('x', 200), "application/json");
         });
+        var transport = Transport("https://pagerduty.example/api", connectorBytes);
         var profile = new InvestigationProfile
         {
             Id = "profile",
-            PagerDuty = new PagerDutyScope
-            {
-                Connector = Transport("https://pagerduty.example/api", connectorBytes)
-            }
+            PagerDuty = new PagerDutyScope()
         };
         var connector = new PagerDutyEvidenceConnector(
-            new StubHttpClientFactory(handler), new ThrowingMcpAdapter());
+            new StubHttpClientFactory(handler), new ThrowingMcpAdapter(),
+            TestConfiguration.EvidenceSources(pagerDuty: transport), TestConfiguration.Credentials());
 
         var result = await connector.CollectAsync(
             Context(profile), Scope(scopeBytes), CancellationToken.None);
@@ -234,12 +237,12 @@ public sealed class NativeConnectorByteBudgetTests
     [Fact]
     public async Task GrafanaCapsLinksAndMarksItemTruncationPartial()
     {
+        var transport = Transport("https://grafana.example", maxBytes: 5000, maxItems: 1);
         var profile = new InvestigationProfile
         {
             Id = "profile",
             Grafana = new GrafanaScope
             {
-                Connector = Transport("https://grafana.example", maxBytes: 5000, maxItems: 1),
                 Dashboards =
                 [
                     new GrafanaDashboard { Uid = "one" },
@@ -250,7 +253,9 @@ public sealed class NativeConnectorByteBudgetTests
         var connector = new GrafanaEvidenceConnector(
             new StubHttpClientFactory(new DelegateHandler(_ => Json("[]"))),
             new ThrowingMcpAdapter(),
-            new SafeTemplateRenderer());
+            new SafeTemplateRenderer(),
+            TestConfiguration.EvidenceSources(grafana: transport),
+            TestConfiguration.Credentials());
 
         var result = await connector.CollectAsync(
             Context(profile), Scope(maxBytes: 5000), CancellationToken.None);
@@ -263,12 +268,12 @@ public sealed class NativeConnectorByteBudgetTests
     [Fact]
     public async Task VictoriaLogsCapsFindingsAndLinksAndMarksItemTruncationPartial()
     {
+        var transport = Transport("https://logs.example", maxBytes: 5000, maxItems: 1);
         var profile = new InvestigationProfile
         {
             Id = "profile",
             VictoriaLogs = new VictoriaLogsScope
             {
-                Connector = Transport("https://logs.example", maxBytes: 5000, maxItems: 1),
                 Queries =
                 [
                     new VictoriaLogsQuery { Name = "one", Expression = "one" },
@@ -279,7 +284,9 @@ public sealed class NativeConnectorByteBudgetTests
         var connector = new VictoriaLogsEvidenceConnector(
             new StubHttpClientFactory(new DelegateHandler(_ => Json("{\"hits\":[{\"total\":0}]}"))),
             new ThrowingMcpAdapter(),
-            new SafeTemplateRenderer());
+            new SafeTemplateRenderer(),
+            TestConfiguration.EvidenceSources(victoriaLogs: transport),
+            TestConfiguration.Credentials());
 
         var result = await connector.CollectAsync(
             Context(profile), Scope(maxBytes: 5000), CancellationToken.None);
@@ -297,17 +304,18 @@ public sealed class NativeConnectorByteBudgetTests
             request.RequestUri!.AbsolutePath is "/v1/job/one" or "/v1/job/two"
                 ? Json("{\"Status\":\"running\",\"SubmitTime\":\"2026-07-11T10:00:00Z\"}")
                 : Json("[]"));
+        var transport = Transport("https://nomad.example", maxBytes: 5000, maxItems: 1);
         var profile = new InvestigationProfile
         {
             Id = "profile",
             Nomad = new NomadScope
             {
-                Connector = Transport("https://nomad.example", maxBytes: 5000, maxItems: 1),
                 Namespaces = [new NomadNamespace { Name = "production", Jobs = ["one", "two"] }]
             }
         };
         var connector = new NomadEvidenceConnector(
-            new StubHttpClientFactory(handler), new ThrowingMcpAdapter());
+            new StubHttpClientFactory(handler), new ThrowingMcpAdapter(),
+            TestConfiguration.EvidenceSources(nomad: transport), TestConfiguration.Credentials());
 
         var result = await connector.CollectAsync(
             Context(profile), Scope(maxBytes: 5000), CancellationToken.None);
@@ -341,6 +349,7 @@ public sealed class NativeConnectorByteBudgetTests
     {
         Mode = "api",
         BaseUrl = baseUrl,
+        CredentialEnv = "TEST_TOKEN",
         TimeoutSeconds = 5,
         MaxItems = maxItems,
         MaxBytes = maxBytes

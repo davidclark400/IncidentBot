@@ -54,12 +54,13 @@ public sealed class IncidentRepository(NpgsqlDataSource dataSource, TimeProvider
             insert into incidents(
                 id, pagerduty_incident_id, service_id, profile_id, title, urgency, state, status,
                 triggered_at, updated_at, slack_channel, labels_json, is_frozen)
-            values ($1, $2, $3, $4, $5, $6, $7, $13, $8, $8, $9, $10::jsonb, $11)
+            values ($1, $2, $3, $4, $5, $6, $7, $13, $15, $8, $9, $10::jsonb, $11)
             on conflict (pagerduty_incident_id) do update set
                 service_id = excluded.service_id,
                 profile_id = excluded.profile_id,
                 title = excluded.title,
                 urgency = excluded.urgency,
+                triggered_at = least(incidents.triggered_at, excluded.triggered_at),
                 state = case when excluded.state = 'Unknown' then incidents.state else excluded.state end,
                 status = case when excluded.is_frozen then $14 else $13 end,
                 updated_at = excluded.updated_at,
@@ -86,6 +87,7 @@ public sealed class IncidentRepository(NpgsqlDataSource dataSource, TimeProvider
         upsert.Parameters.AddWithValue(webhook.EventType);
         upsert.Parameters.AddWithValue(IncidentProgression.Queued);
         upsert.Parameters.AddWithValue(IncidentProgression.Finalizing);
+        upsert.Parameters.AddWithValue(webhook.TriggeredAt);
         incidentId = (Guid)(await upsert.ExecuteScalarAsync(cancellationToken)
             ?? throw new InvalidOperationException("Incident upsert did not return an id."));
 

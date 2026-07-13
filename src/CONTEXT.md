@@ -29,7 +29,7 @@ Repeated work for the same incident must be safe. Concurrent report updates use 
 
 ### Investigation profile
 
-Configuration selected from the incident's service identity and labels. A profile determines which evidence sources are enabled, their allowed scope and transport, and the Slack destination.
+Configuration selected from the incident's service identity and labels. A profile determines which evidence sources are enabled, their allowed scope, and the Slack destination. Evidence-source endpoints and transports are application configuration, not profile configuration.
 
 Profile revision is included in evidence scope and reports so responders can identify the configuration used for an investigation.
 
@@ -47,6 +47,10 @@ Each source returns a connector result containing:
 - a bounded diagnostic when collection is incomplete.
 
 Source health is complete, partial, unavailable, excluded, or pending. Failure of one source must not prevent the other sources or the investigation report from completing.
+
+Source request state is separate from health: `requested` means the connector call has been sent and is awaiting a response, `received` means the connector returned (including a partial result), and `errored` means the source was unavailable. Every collection pass republishes `requested` before its connector calls start.
+
+An **adaptive evidence window** begins at the configured lookback and expands exponentially to a bounded maximum while the accumulated evidence remains deterministically inconclusive. The initial scope ends at one fixed collection time; each expansion queries only the disjoint older ring between the previous and new lookback. Window-sensitive connectors may be queried again; exact/current snapshot connectors are not. Collection stops only for an explicit structured failure, temporally close high-signal findings from distinct sources, or a change that precedes a recent failure signal. Otherwise it records a bounded inconclusive outcome at the maximum window or when no source can expand. Findings from every ring remain available, while stable aggregate snapshots are combined, cumulative retained results stay within item and byte limits, and synthesis may semantically compress repetitive evidence without removing the auditable report evidence.
 
 ### Connector
 
@@ -76,7 +80,7 @@ A report projection of evidence that may help explain the incident's candidate c
 
 ### Investigation report
 
-The versioned responder-facing projection of an investigation. It contains deterministic status and summary information, evidence, timeline, source health, links, AI synthesis status and output, causal events, and recurrence context.
+The versioned responder-facing projection of an investigation. It contains deterministic status and summary information, evidence, timeline, source health and request state, links, AI synthesis status and output, causal events, and recurrence context.
 
 The report is the primary wire contract shared by the API, web client, Slack publishing, persistence, and demo mode. Contract changes must remain backwards-compatible with older persisted reports unless an explicit migration is provided.
 
@@ -154,7 +158,7 @@ A self-contained adapter used to demonstrate the live report experience without 
 ## Established architecture seams
 
 - `IncidentProgression` owns investigation status names and responder-visible progression decisions while persisted reports retain backwards-compatible string values.
-- `EvidenceSourceRegistry` owns the five-source roster, profile-to-transport lookup, connector registration, and enabled-source selection. Source-specific collection and validation remain with their adapters and profile models.
+- `EvidenceSourceRegistry` owns the five-source roster, application transport lookup, connector registration, and profile-enabled source selection. Source-specific collection remains with its adapters; profile models own only resource scope.
 - `EvidenceRankingPolicy` owns responder-facing evidence relevance, grouping, source diversity, and deterministic ordering. Report, AI, Slack, and connector truncation must use this shared policy rather than treating severity as presentation priority.
 - `IRecurrenceCoordinator` is the investigation workflow's recurrence interface. It owns provisional/final orchestration and unavailable-state mapping; the runner does not coordinate fingerprint construction and matching directly.
 - `RecurrencePolicy` owns candidate ranking, association thresholds, problem keys, time cutoffs, and lifecycle classification. PostgreSQL persistence owns locking and storage.

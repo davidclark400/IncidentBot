@@ -10,6 +10,7 @@ using IncidentBot.Api.Options;
 using IncidentBot.Api.Profiles;
 using IncidentBot.Api.Security;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using Npgsql;
 using System.Reflection;
@@ -22,6 +23,8 @@ var generatingOpenApi = Assembly.GetEntryAssembly()?.GetName().Name == "GetDocum
 builder.Services.AddOptions<IncidentBotOptions>()
     .Bind(builder.Configuration.GetSection(IncidentBotOptions.SectionName))
     .ValidateDataAnnotations()
+    .Validate(value => value.EvidenceMaximumWindowMinutes >= value.EvidenceWindowMinutes,
+        "EvidenceMaximumWindowMinutes must be at least EvidenceWindowMinutes.")
     .Validate(value => value.FingerprintPossibleThreshold < value.FingerprintAutomaticThreshold,
         "FingerprintPossibleThreshold must be lower than FingerprintAutomaticThreshold.")
     .Validate(value => value.FingerprintRetentionDays >= value.RetentionDays,
@@ -33,14 +36,25 @@ builder.Services.AddOptions<IncidentBotOptions>()
 builder.Services.AddOptions<PagerDutyOptions>()
     .Bind(builder.Configuration.GetSection(PagerDutyOptions.SectionName))
     .ValidateDataAnnotations()
+    .Validate(value => CredentialVariableName.IsValid(value.WebhookSecretEnv),
+        "PagerDuty:WebhookSecretEnv must be a valid environment-variable name.")
     .ValidateOnStart();
+builder.Services.AddOptions<EvidenceSourceOptions>()
+    .Bind(builder.Configuration.GetSection(EvidenceSourceOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<EvidenceSourceOptions>, EvidenceSourceOptionsValidator>();
 builder.Services.AddOptions<SlackOptions>()
     .Bind(builder.Configuration.GetSection(SlackOptions.SectionName))
     .ValidateDataAnnotations()
+    .Validate(value => CredentialVariableName.IsValid(value.BotTokenEnv)
+        && CredentialVariableName.IsValid(value.AppTokenEnv),
+        "Slack credential settings must be valid environment-variable names.")
     .ValidateOnStart();
 builder.Services.AddOptions<LiteLlmOptions>()
     .Bind(builder.Configuration.GetSection(LiteLlmOptions.SectionName))
     .ValidateDataAnnotations()
+    .Validate(value => CredentialVariableName.IsValid(value.ApiKeyEnv),
+        "LiteLlm:ApiKeyEnv must be a valid environment-variable name.")
     .ValidateOnStart();
 builder.Services.AddOptions<IngressIdentityOptions>()
     .Bind(builder.Configuration.GetSection(IngressIdentityOptions.SectionName))
@@ -58,6 +72,8 @@ if (demoEnabled && !generatingOpenApi && !builder.Environment.IsDevelopment())
 }
 
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<EvidenceSourceConfiguration>();
+builder.Services.AddSingleton<ICredentialProvider, EnvironmentCredentialProvider>();
 builder.Services.AddHttpClient();
 builder.Services.AddSignalR(options => options.MaximumReceiveMessageSize = 16 * 1024);
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -84,6 +100,7 @@ if (demoEnabled)
 {
     builder.Services.AddSingleton<DemoIncidentStore>();
     builder.Services.AddSingleton<IIncidentReportReader>(services => services.GetRequiredService<DemoIncidentStore>());
+    builder.Services.AddSingleton<IPagerDutyPullService, DemoPagerDutyPullService>();
     if (!generatingOpenApi)
     {
         builder.Services.AddHostedService<DemoIncidentWorker>();
@@ -95,9 +112,10 @@ else
         ?? throw new InvalidOperationException("ConnectionStrings:IncidentBot is required.");
     builder.Services.AddSingleton(NpgsqlDataSource.Create(connectionString));
     builder.Services.AddSingleton<InvestigationProfileStore>();
-    builder.Services.AddSingleton<IEnvironmentVariableSource, ProcessEnvironmentVariableSource>();
     builder.Services.AddSingleton<DeploymentReadinessChecker>();
     builder.Services.AddSingleton<PagerDutySignatureValidator>();
+    builder.Services.AddSingleton<PagerDutyIncidentClient>();
+    builder.Services.AddSingleton<IPagerDutyPullService, PagerDutyPullService>();
     builder.Services.AddSingleton<SafeTemplateRenderer>();
     builder.Services.AddSingleton<McpStreamableHttpClient>();
     builder.Services.AddSingleton<IMcpEvidenceAdapter>(services => services.GetRequiredService<McpStreamableHttpClient>());
@@ -106,6 +124,7 @@ else
     builder.Services.AddSingleton<DurableQueueRepository>();
     builder.Services.AddSingleton<IDurableQueue<WorkItem>>(services => services.GetRequiredService<DurableQueueRepository>());
     builder.Services.AddSingleton<IDurableQueue<OutboxItem>>(services => services.GetRequiredService<DurableQueueRepository>());
+    builder.Services.AddSingleton<AdaptiveEvidenceCollector>();
     builder.Services.AddSingleton<ReportComposer>();
     builder.Services.AddIncidentRecurrence();
     builder.Services.AddSingleton<LiteLlmSynthesizer>();
@@ -177,6 +196,7 @@ else
     app.MapPagerDutyWebhook();
 }
 app.MapIncidentApi();
+app.MapPagerDutyPullApi();
 app.MapHub<IncidentHub>("/hubs/incidents");
 app.MapFallbackToFile("index.html");
 

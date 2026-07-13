@@ -21,6 +21,13 @@ public enum SourceHealth
     Excluded
 }
 
+public enum SourceRequestState
+{
+    Requested,
+    Received,
+    Errored
+}
+
 public enum FingerprintStage
 {
     Provisional,
@@ -100,7 +107,8 @@ public sealed record SourceReport(
     int FindingCount,
     long DurationMilliseconds,
     string? Diagnostic,
-    IReadOnlyList<SourceLink> Links);
+    IReadOnlyList<SourceLink> Links,
+    SourceRequestState RequestState);
 
 public sealed record AiDiagnosis(
     string Summary,
@@ -208,3 +216,27 @@ public sealed record IncidentStatusChanged(Guid IncidentId, string Status, int V
 public sealed record DemoAvailability(bool Enabled, Guid IncidentId, string IncidentUrl);
 
 public sealed record DemoReset(Guid IncidentId, string IncidentUrl, int Version);
+
+public sealed record RecentPagerDutyIncident(
+    string Id,
+    int IncidentNumber,
+    string Title,
+    string Status,
+    string Urgency,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset LastStatusChangeAt,
+    string ServiceId,
+    string ServiceName,
+    IReadOnlyList<string> Assignees,
+    string? HtmlUrl);
+
+public sealed record RecentPagerDutyIncidents(
+    DateTimeOffset Since,
+    DateTimeOffset Until,
+    bool HasMore,
+    IReadOnlyList<RecentPagerDutyIncident> Incidents);
+
+public sealed record IncidentTriggerResult(
+    Guid IncidentId,
+    string IncidentUrl,
+    bool Duplicate);

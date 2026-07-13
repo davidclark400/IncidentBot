@@ -1,5 +1,5 @@
 import { AnimatePresence } from 'motion/react'
-import type { CausalEvent, Report, Source, SourceHealth, SummaryReference } from '../incidentReport'
+import type { CausalEvent, Report, Source, SourceHealth, SourceRequestState, SummaryReference } from '../incidentReport'
 import { formatTime } from './formatTime'
 import { Badge, CodeReferenceLink, LiveItem } from './ui'
 
@@ -7,6 +7,8 @@ type Diagnoses = NonNullable<NonNullable<Report['ai']>['diagnoses']>
 
 export function SummaryAndCoverage({ report }: { report: Report }) {
   const sources = report.sources ?? []
+  const allSourcesComplete = sources.length > 0 && sources.every((source) =>
+    source.requestState === 'received' && source.health === 'complete')
   return (
     <section className="mb-6 grid gap-4 lg:grid-cols-[1.5fr_1fr]">
       <article className="surface p-4 sm:p-6" aria-labelledby="llm-summary-title">
@@ -17,7 +19,12 @@ export function SummaryAndCoverage({ report }: { report: Report }) {
       </article>
       <article className="surface p-4 sm:p-6">
         <div className="flex items-center justify-between"><p className="eyebrow">Source coverage</p><span className="text-xs text-muted-foreground">{sources.filter((source) => source.health === 'complete').length}/{sources.length}</span></div>
-        <div className="mt-4 space-y-3">{sources.length === 0 && <SkeletonRows />}{sources.map((source) => <SourceRow key={source.source} source={source} />)}</div>
+        <div className="mt-4 space-y-3" aria-live="polite">
+          {sources.length === 0 && <SkeletonRows />}
+          {allSourcesComplete
+            ? <AllSourcesComplete />
+            : sources.map((source) => <SourceRow key={source.source} source={source} />)}
+        </div>
       </article>
     </section>
   )
@@ -50,8 +57,57 @@ function InlineSummary({ ai, fallback }: { ai: Report['ai']; fallback: string })
 }
 
 function SourceRow({ source }: { source: Source }) {
-  const colors: Record<SourceHealth, string> = { complete: 'bg-emerald-500', partial: 'bg-amber-500', unavailable: 'bg-rose-500', excluded: 'bg-muted-foreground', pending: 'bg-foreground animate-pulse' }
-  return <div className="flex items-center gap-3 text-sm"><span className={`status-dot ${colors[source.health]}`} /><span className="flex-1 capitalize text-foreground">{source.source}</span><span className="font-mono text-xs text-muted-foreground">{source.findingCount ?? 0} · {source.durationMilliseconds ?? 0}ms</span></div>
+  const state = requestStatePresentation[source.requestState]
+  const health = healthPresentation[source.health]
+  const metadata = source.requestState === 'requested'
+    ? 'Waiting for response'
+    : source.requestState === 'errored'
+      ? `${source.durationMilliseconds ?? 0}ms`
+      : `${health.label} · ${source.findingCount ?? 0} finding${source.findingCount === 1 ? '' : 's'} · ${source.durationMilliseconds ?? 0}ms`
+
+  return (
+    <div className="flex items-center gap-3 text-sm" data-source-request data-request-state={source.requestState}>
+      <TrafficLight state={source.requestState} />
+      <span className="min-w-0 flex-1 capitalize text-foreground">{source.source}</span>
+      <span className="text-right">
+        <span className={`block text-xs font-semibold ${state.textClass}`}>{state.label}</span>
+        <span className="block font-mono text-[10px] text-muted-foreground">{metadata}</span>
+      </span>
+    </div>
+  )
+}
+
+function AllSourcesComplete() {
+  return (
+    <div className="flex items-center gap-3 text-sm text-emerald-700 dark:text-emerald-300">
+      <TrafficLight state="received" />
+      <span className="font-medium">All source requests received</span>
+    </div>
+  )
+}
+
+function TrafficLight({ state }: { state: SourceRequestState }) {
+  return (
+    <span className="flex shrink-0 flex-col gap-0.5 rounded-full border border-border bg-muted/50 p-1" aria-hidden="true">
+      <span className={`size-1.5 rounded-full ${state === 'errored' ? 'bg-rose-500 shadow-sm shadow-rose-500/50' : 'bg-rose-500/15'}`} />
+      <span className={`size-1.5 rounded-full ${state === 'requested' ? 'animate-pulse bg-amber-500 shadow-sm shadow-amber-500/50' : 'bg-amber-500/15'}`} />
+      <span className={`size-1.5 rounded-full ${state === 'received' ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-emerald-500/15'}`} />
+    </span>
+  )
+}
+
+const requestStatePresentation: Record<SourceRequestState, { label: string; textClass: string }> = {
+  requested: { label: 'Requested', textClass: 'text-amber-700 dark:text-amber-300' },
+  received: { label: 'Received', textClass: 'text-emerald-700 dark:text-emerald-300' },
+  errored: { label: 'Errored', textClass: 'text-rose-700 dark:text-rose-300' },
+}
+
+const healthPresentation: Record<SourceHealth, { label: string }> = {
+  pending: { label: 'pending' },
+  complete: { label: 'complete' },
+  partial: { label: 'partial' },
+  unavailable: { label: 'unavailable' },
+  excluded: { label: 'excluded' },
 }
 
 function CausalEventCard({ event, index }: { event: CausalEvent; index: number }) {

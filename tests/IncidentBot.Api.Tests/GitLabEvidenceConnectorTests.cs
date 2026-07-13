@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using IncidentBot.Api.Connectors;
 using IncidentBot.Api.Domain;
+using IncidentBot.Api.Options;
 
 namespace IncidentBot.Api.Tests;
 
@@ -97,18 +98,14 @@ public sealed class GitLabEvidenceConnectorTests
     }
 
     private static GitLabEvidenceConnector CreateConnector(HttpMessageHandler handler) =>
-        new(new StubHttpClientFactory(handler), new UnexpectedMcpAdapter());
+        new(
+            new StubHttpClientFactory(handler),
+            new UnexpectedMcpAdapter(),
+            TestConfiguration.EvidenceSources(gitLab: Transport()),
+            TestConfiguration.Credentials());
 
     private static InvestigationContext Context()
     {
-        var transport = new ConnectorTransport
-        {
-            Mode = "api",
-            BaseUrl = "https://gitlab.example/",
-            TimeoutSeconds = 30,
-            MaxItems = 50,
-            MaxBytes = 200_000
-        };
         return new InvestigationContext(
             Guid.NewGuid(), "PD-1", "payments", "Checkout failures", "high", IncidentState.Triggered,
             DateTimeOffset.Parse("2026-07-11T10:00:00Z"), new Dictionary<string, string>(),
@@ -117,7 +114,6 @@ public sealed class GitLabEvidenceConnectorTests
                 Id = "payments",
                 GitLab = new GitLabScope
                 {
-                    Connector = transport,
                     Projects =
                     [
                         new GitLabProject
@@ -129,6 +125,16 @@ public sealed class GitLabEvidenceConnectorTests
                 }
             });
     }
+
+    private static ConnectorTransport Transport() => new()
+    {
+        Mode = "api",
+        BaseUrl = "https://gitlab.example/",
+        CredentialEnv = "GITLAB_READ_TOKEN",
+        TimeoutSeconds = 30,
+        MaxItems = 50,
+        MaxBytes = 200_000
+    };
 
     private static EvidenceScope Scope(int maxItems, int maxBytes) => new(
         DateTimeOffset.Parse("2026-07-11T09:00:00Z"),

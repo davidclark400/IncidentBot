@@ -42,7 +42,6 @@ public sealed class InvestigationProfileStore : IInvestigationProfileProvider
 
         var deserializer = new DeserializerBuilder()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)
-            .IgnoreUnmatchedProperties()
             .Build();
         _document = deserializer.Deserialize<ProfileDocument>(File.ReadAllText(path))
             ?? throw new InvalidOperationException("Investigation profile file is empty.");
@@ -98,7 +97,7 @@ public sealed class InvestigationProfileStore : IInvestigationProfileProvider
         return variables.OrderBy(value => value, StringComparer.Ordinal).ToList();
     }
 
-    public bool UsesMcpTransport() =>
+    public bool EnabledSourceUsesMcpTransport() =>
         _document.Profiles.SelectMany(profile =>
             evidenceSources.ConfiguredTransports(profile).Select(value => value.Transport))
             .Any(transport => transport.Mode == "mcp");
@@ -108,13 +107,13 @@ public sealed class InvestigationProfileStore : IInvestigationProfileProvider
         var issues = new List<string>();
         foreach (var profile in _document.Profiles)
         {
-            foreach (var (_, transport) in evidenceSources.ConfiguredTransports(profile))
+            foreach (var (source, transport) in evidenceSources.ConfiguredTransports(profile))
             {
                 var configuredUrl = transport.Mode == "mcp" ? transport.Mcp?.ServerUrl : transport.BaseUrl;
                 if (Uri.TryCreate(configuredUrl, UriKind.Absolute, out var uri)
                     && uri.Host.EndsWith(".example", StringComparison.OrdinalIgnoreCase))
                 {
-                    issues.Add($"Profile '{profile.Id}' still uses placeholder host '{uri.Host}'.");
+                    issues.Add($"Evidence source '{source}' still uses placeholder host '{uri.Host}'.");
                 }
             }
         }
@@ -220,7 +219,7 @@ public sealed class InvestigationProfileStore : IInvestigationProfileProvider
 
     private void Validate(ProfileDocument document)
     {
-        if (document.Version != 1)
+        if (document.Version != 2)
         {
             throw new InvalidOperationException($"Unsupported profile schema version {document.Version}.");
         }
@@ -242,11 +241,6 @@ public sealed class InvestigationProfileStore : IInvestigationProfileProvider
             if (string.IsNullOrWhiteSpace(profile.Id) || string.IsNullOrWhiteSpace(profile.PagerDutyServiceId))
             {
                 throw new InvalidOperationException("Every profile requires id and pagerDutyServiceId.");
-            }
-
-            foreach (var (source, transport) in evidenceSources.ConfiguredTransports(profile))
-            {
-                ValidateTransport(profile.Id, source, transport);
             }
 
             if (profile.Nomad?.Namespaces.Any(item => string.IsNullOrWhiteSpace(item.Name) || item.Jobs.Count == 0) == true)
@@ -272,36 +266,4 @@ public sealed class InvestigationProfileStore : IInvestigationProfileProvider
         }
     }
 
-    private static void ValidateTransport(string profileId, string source, ConnectorTransport? transport)
-    {
-        if (transport is null)
-        {
-            return;
-        }
-
-        if (transport.Mode is not ("api" or "mcp"))
-        {
-            throw new InvalidOperationException($"Profile '{profileId}' source '{source}' has unsupported mode '{transport.Mode}'.");
-        }
-
-        if (transport.TimeoutSeconds is < 1 or > 120
-            || transport.MaxItems is < 1 or > 1000
-            || transport.MaxBytes is < 1024 or > 4_194_304)
-        {
-            throw new InvalidOperationException(
-                $"Profile '{profileId}' source '{source}' has invalid timeout, item, or byte limits.");
-        }
-
-        if (transport.Mode == "api" && !Uri.TryCreate(transport.BaseUrl, UriKind.Absolute, out _))
-        {
-            throw new InvalidOperationException($"Profile '{profileId}' source '{source}' requires an absolute API baseUrl.");
-        }
-
-        if (transport.Mode == "mcp" && (transport.Mcp is null
-            || !Uri.TryCreate(transport.Mcp.ServerUrl, UriKind.Absolute, out _)
-            || string.IsNullOrWhiteSpace(transport.Mcp.ToolName)))
-        {
-            throw new InvalidOperationException($"Profile '{profileId}' source '{source}' requires an MCP serverUrl and toolName.");
-        }
-    }
 }

@@ -106,7 +106,8 @@ public static class IncidentContractMapper
         item.FindingCount,
         item.DurationMilliseconds,
         item.Diagnostic,
-        item.Links.Select(ToContract).ToArray());
+        item.Links.Select(ToContract).ToArray(),
+        ToContract(item.RequestState ?? RequestStateFor(item.Health)));
 
     private static ApiContract.SourceLink ToContract(Domain.SourceLink item) => new(item.Label, item.Url);
 
@@ -177,6 +178,21 @@ public static class IncidentContractMapper
         Domain.SourceHealth.Unavailable => ApiContract.SourceHealth.Unavailable,
         Domain.SourceHealth.Excluded => ApiContract.SourceHealth.Excluded,
         _ => throw new ArgumentOutOfRangeException(nameof(value), value, null)
+    };
+
+    private static ApiContract.SourceRequestState ToContract(Domain.SourceRequestState value) => value switch
+    {
+        Domain.SourceRequestState.Received => ApiContract.SourceRequestState.Received,
+        Domain.SourceRequestState.Requested => ApiContract.SourceRequestState.Requested,
+        Domain.SourceRequestState.Errored => ApiContract.SourceRequestState.Errored,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, null)
+    };
+
+    private static Domain.SourceRequestState RequestStateFor(Domain.SourceHealth health) => health switch
+    {
+        Domain.SourceHealth.Pending => Domain.SourceRequestState.Requested,
+        Domain.SourceHealth.Unavailable => Domain.SourceRequestState.Errored,
+        _ => Domain.SourceRequestState.Received
     };
 
     private static ApiContract.FingerprintStage ToContract(Domain.FingerprintStage value) => value switch

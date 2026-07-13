@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using IncidentBot.Api.Domain;
+using IncidentBot.Api.Infrastructure;
 using IncidentBot.Api.Options;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
@@ -13,6 +14,7 @@ namespace IncidentBot.Api.Connectors;
 public sealed class McpStreamableHttpClient(
     IHttpClientFactory httpClientFactory,
     IOptions<IncidentBotOptions> options,
+    ICredentialProvider credentials,
     ILogger<McpStreamableHttpClient> logger) : IMcpEvidenceAdapter
 {
     private const int MaximumProtocolResponseBytes = 1024 * 1024;
@@ -168,9 +170,7 @@ public sealed class McpStreamableHttpClient(
 
             var connectorResult = JsonSerializer.Deserialize<ConnectorResult>(json, JsonOptions)
                 ?? throw new InvalidOperationException("MCP connector result was empty.");
-            var credential = string.IsNullOrWhiteSpace(configuration.CredentialEnv)
-                ? null
-                : Environment.GetEnvironmentVariable(configuration.CredentialEnv);
+            var credential = credentials.Get(configuration.CredentialEnv);
             connectorResult = McpConnectorResultBoundary.Normalize(
                 source, connectorResult, scope, context.TriggeredAt, allowedBaseUrl, allowedResourceNode, credential);
             logger.LogDebug(
@@ -197,7 +197,7 @@ public sealed class McpStreamableHttpClient(
     private static string ServerHost(string serverUrl) =>
         Uri.TryCreate(serverUrl, UriKind.Absolute, out var uri) ? uri.Host : "invalid-host";
 
-    private static async Task<McpResponse> SendAsync(
+    private async Task<McpResponse> SendAsync(
         HttpClient client,
         McpToolConfiguration configuration,
         string? sessionId,
@@ -211,9 +211,7 @@ public sealed class McpStreamableHttpClient(
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
         request.Headers.TryAddWithoutValidation("MCP-Protocol-Version", "2025-06-18");
         if (!string.IsNullOrWhiteSpace(sessionId)) request.Headers.TryAddWithoutValidation("Mcp-Session-Id", sessionId);
-        var credential = string.IsNullOrWhiteSpace(configuration.CredentialEnv)
-            ? null
-            : Environment.GetEnvironmentVariable(configuration.CredentialEnv);
+        var credential = credentials.Get(configuration.CredentialEnv);
         if (!string.IsNullOrWhiteSpace(credential)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", credential);
         request.Content = new StringContent(message.ToJsonString(), Encoding.UTF8, "application/json");
 

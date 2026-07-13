@@ -1,5 +1,5 @@
-version: 1
-revision: "2026-07-11.1"
+version: 2
+revision: "2026-07-13.1"
 fallbackSlackChannel: "#incident-response"
 
 profiles:
@@ -7,23 +7,9 @@ profiles:
     pagerDutyServiceId: P123PAYMENTS
     team: payments
     slackChannel: "#payments-incidents"
-    pagerDuty:
-      connector:
-        mode: api
-        baseUrl: https://api.pagerduty.com
-        credentialEnv: PAGERDUTY_API_TOKEN
-        timeoutSeconds: 8
-        maxItems: 10
-        maxBytes: 65536
+    pagerDuty: {}
 
     nomad:
-      connector:
-        mode: api
-        baseUrl: https://nomad.internal.example
-        credentialEnv: NOMAD_TOKEN
-        timeoutSeconds: 12
-        maxItems: 50
-        maxBytes: 131072
       region: global
       namespaces:
         - name: payments-production
@@ -32,13 +18,6 @@ profiles:
             - payments-worker
 
     gitLab:
-      connector:
-        mode: api
-        baseUrl: https://gitlab.internal.example
-        credentialEnv: GITLAB_READ_TOKEN
-        timeoutSeconds: 12
-        maxItems: 30
-        maxBytes: 196608
       projects:
         - id: platform/payments
           branch: main
@@ -49,13 +28,6 @@ profiles:
             - deploy/nomad
 
     grafana:
-      connector:
-        mode: api
-        baseUrl: https://grafana.internal.example
-        credentialEnv: GRAFANA_SERVICE_TOKEN
-        timeoutSeconds: 12
-        maxItems: 50
-        maxBytes: 262144
       organizationId: 1
       annotationTags:
         - payments
@@ -74,13 +46,6 @@ profiles:
           warningAbove: 1.5
 
     victoriaLogs:
-      connector:
-        mode: api
-        baseUrl: https://victorialogs.internal.example
-        credentialEnv: VICTORIALOGS_TOKEN
-        timeoutSeconds: 12
-        maxItems: 30
-        maxBytes: 196608
       accountId: "1"
       projectId: "20"
       streamFilters:

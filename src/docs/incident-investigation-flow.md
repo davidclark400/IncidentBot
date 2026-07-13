@@ -2,7 +2,7 @@
 
 This document describes the production path from an accepted PagerDuty event to the live web report, Slack message, and PostgreSQL records. It reflects the current implementation in `IncidentBot.Api`; demo mode is a separate staged-report adapter.
 
-The concrete projects, jobs, dashboards, log queries, labels, and connector transports are supplied by the runtime investigation-profile YAML. That file is not present in this repository, so the source descriptions below document the search shape and enforcement boundaries rather than environment-specific targets.
+The concrete projects, jobs, dashboards, log queries, and labels are supplied by the investigation-profile YAML. Connector endpoints, credentials, API/MCP selection, timeouts, and source limits come from application configuration. The source descriptions below document the search shape and enforcement boundaries rather than environment-specific targets.
 
 ## Section map
 
@@ -44,14 +44,15 @@ For each leased work item, `InvestigationRunner`:
 
 1. Loads the current incident and resolves the current profile.
 2. Generates and persists a provisional deterministic fingerprint from the incident and safe labels, then looks for possible historical problem matches.
-3. If the incident has no report version, saves an initial `collecting` report with pending source states. Saving that version also creates Slack outbox work, and SignalR tells connected clients to refetch it.
+3. Saves a `collecting` report with each enabled source marked `requested` before its connector call starts. The first pass creates the report; later passes reset the request states on the previous report. Saving that version also creates Slack outbox work, and SignalR tells connected clients to refetch it.
 4. Sets the persisted investigation status to `collecting`.
-5. Builds an `InvestigationContext` and `EvidenceScope`.
-6. Selects only profile-enabled connectors and runs them concurrently with `Task.WhenAll`.
-7. Converts a connector exception into an `unavailable` result without cancelling the other sources.
-8. Sends the bounded connector results to synthesis, composes the deterministic report, resolves the final recurrence context, persists a new version, and publishes the version through SignalR.
+5. Builds an `InvestigationContext` and asks the adaptive evidence collector for a bounded result set.
+6. Starts with the configured evidence window, runs the profile-enabled connectors concurrently, and doubles the lookback while accumulated evidence remains deterministically inconclusive.
+7. Fixes the initial collection end time, then queries only disjoint older rings as the window expands: 0–30 minutes, 30–60, 60–120, and 120–240 with the checked-in defaults. PagerDuty and Nomad are exact/current snapshots, so they run only in the first pass; GitLab, Grafana, and VictoriaLogs query each older ring.
+8. Converts a connector exception into an `unavailable` result without cancelling the other sources. If a wider call fails, useful evidence retained from a narrower call remains available and the source is marked partial.
+9. Sends the bounded merged results to synthesis, composes the deterministic report, resolves the final recurrence context, persists a new version, and publishes the version through SignalR.
 
-With the checked-in defaults, evidence scope starts 30 minutes before `triggeredAt` and ends at collection time, with global ceilings of 250 items and 1 MiB. Each connector also applies the stricter of those limits and its profile-specific item/byte limits. Some APIs accept an exact time range; exact incident or current-workload lookups use the same context without pretending to be server-side time searches.
+The deterministic clarity policy does not stop for one generic high-signal item. It stops for a structured explicit failure, high-signal findings from distinct sources within ten minutes of each other, or a scoped change that precedes a recent failure signal from another source. If none appears, the collection outcome explicitly records that the maximum window was reached or that no selected connector supports expansion. Each connector call still has ceilings of 250 items and 1 MiB by default, and the merged retained result for each source is capped again across all rings. Each connector also applies the stricter of those limits and its application-configured item/byte limits. Structured pass logs record the queried ring, duration, returned/new/duplicate finding counts, source health counts, clarity reason, final completion reason, and supporting evidence IDs. Configure the initial and maximum bounds with `IncidentBot:EvidenceWindowMinutes` and `IncidentBot:EvidenceMaximumWindowMinutes`; the maximum must be at least the initial value.
 
 ## 3. What each evidence source searches
 
@@ -69,13 +70,15 @@ Editable source: [`incidentbot-source-searches.excalidraw`](diagrams/incidentbot
 
 ### Native API and MCP use the same connector contract
 
-Each profile source selects either `api` or `mcp` transport. Both return a `ConnectorResult` with:
+Each application-configured evidence source selects either `api` or `mcp` transport. A profile only enables that source and supplies its resource allowlist. Both transports return a `ConnectorResult` with:
 
 - source health and a bounded diagnostic;
 - bounded, source-attributed findings;
 - timeline candidates;
 - responder links;
 - collection duration.
+
+The report tracks the connector-call lifecycle separately: `requested` while awaiting the result, `received` when the connector returns a complete, partial, or excluded result, and `errored` when it returns unavailable. The web source-coverage panel renders this state as soon as the request-start report is published.
 
 The native path uses cumulative byte accounting, item limits, bounded reads, per-source timeouts, stable IDs, and structured provenance. Exhausting a budget results in `partial` health where useful retained evidence exists.
 
@@ -93,7 +96,7 @@ AI receives a purpose-built digest, never raw connector response bodies.
 
 The synthesizer first removes exact duplicates by `source + evidence ID`. It builds an exact digest and uses it if it fits the configured input-character budget, which is 24,000 characters by default.
 
-Only when that exact digest is budget-constrained does it try semantic compression. The compressor deliberately has a narrow scope:
+Only when that exact digest is budget-constrained does it try semantic compression. This is also the pressure-release path for evidence accumulated from expanded windows: the report retains the auditable findings, while synthesis groups repetitive evidence before sending the digest. The compressor deliberately has a narrow scope:
 
 - repeated VictoriaLogs `log-sample` templates;
 - equivalent VictoriaLogs query-count snapshots;

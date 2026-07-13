@@ -15,19 +15,72 @@ public sealed class ReportComposer(TimeProvider timeProvider, EvidenceSourceRegi
         ProblemContext? problem = null)
     {
         var sources = evidenceSources.EnabledSources(profile)
-            .Select(source => new SourceReport(source, SourceHealth.Pending, 0, 0, null, []))
+            .Select(source => new SourceReport(
+                source, SourceHealth.Pending, 0, 0, null, [], SourceRequestState.Requested))
             .ToList();
+        var incidentSeverity = incident.Urgency == "high" ? "critical" : "warning";
         var timeline = new List<TimelineCandidate>
         {
-            new(incident.TriggeredAt, "pagerduty", "incident", $"Incident {incident.State.ToString().ToLowerInvariant()}",
-                incident.Urgency == "high" ? "critical" : "warning", null)
+            new(incident.TriggeredAt, "pagerduty", "incident-triggered", "PagerDuty incident triggered",
+                incidentSeverity, null)
         };
+        if (incident.State != IncidentState.Triggered)
+        {
+            timeline.Add(new TimelineCandidate(
+                incident.UpdatedAt,
+                "pagerduty",
+                "incident-state",
+                $"PagerDuty incident {incident.State.ToString().ToLowerInvariant()}",
+                "info",
+                null));
+        }
         return new InvestigationReport(
             incident.Id, incident.PagerDutyIncidentId, incident.ServiceId, profile.Id, profileRevision,
             incident.Title, incident.Urgency, incident.State, IncidentProgression.Collecting, incident.TriggeredAt,
             timeProvider.GetUtcNow(), incident.Version,
             "Investigation started. Evidence collectors are running.",
             new AiSynthesis("pending", null, [], [], [], null), timeline, [], sources, [], [], problem);
+    }
+
+    public InvestigationReport ComposeCollectionStarted(
+        IncidentRecord incident,
+        InvestigationProfile profile,
+        string profileRevision,
+        InvestigationReport? previous,
+        ProblemContext? problem = null)
+    {
+        if (previous is null)
+        {
+            return ComposeInitial(incident, profile, profileRevision, problem);
+        }
+
+        var previousSources = previous.Sources.ToDictionary(source => source.Source, StringComparer.Ordinal);
+        var requestedSources = evidenceSources.EnabledSources(profile)
+            .Select(source => previousSources.TryGetValue(source, out var existing)
+                ? existing with
+                {
+                    Health = SourceHealth.Pending,
+                    FindingCount = 0,
+                    DurationMilliseconds = 0,
+                    Diagnostic = null,
+                    RequestState = SourceRequestState.Requested
+                }
+                : new SourceReport(
+                    source, SourceHealth.Pending, 0, 0, null, [], SourceRequestState.Requested))
+            .ToList();
+
+        return previous with
+        {
+            ProfileId = profile.Id,
+            ProfileRevision = profileRevision,
+            Title = incident.Title,
+            Urgency = incident.Urgency,
+            State = incident.State,
+            Status = IncidentProgression.Collecting,
+            UpdatedAt = timeProvider.GetUtcNow(),
+            Sources = requestedSources,
+            Problem = problem ?? previous.Problem
+        };
     }
 
     public InvestigationReport Compose(
@@ -37,7 +90,8 @@ public sealed class ReportComposer(TimeProvider timeProvider, EvidenceSourceRegi
         IReadOnlyList<ConnectorResult> results,
         InvestigationReport? previous,
         AiSynthesis ai,
-        ProblemContext? problem = null)
+        ProblemContext? problem = null,
+        EvidenceCollectionOutcome? collectionOutcome = null)
     {
         var evidence = (previous?.Evidence ?? [])
             .Concat(results.SelectMany(result => result.Findings))
@@ -51,7 +105,10 @@ public sealed class ReportComposer(TimeProvider timeProvider, EvidenceSourceRegi
             MaximumRetainedTimeline);
         var sources = results.OrderBy(result => result.Source, StringComparer.Ordinal)
             .Select(result => new SourceReport(result.Source, result.Health, result.Findings.Count,
-                result.DurationMilliseconds, result.Diagnostic, result.Links))
+                result.DurationMilliseconds, result.Diagnostic, result.Links,
+                result.Health == SourceHealth.Unavailable
+                    ? SourceRequestState.Errored
+                    : SourceRequestState.Received))
             .ToList();
         var links = results.SelectMany(result => result.Links)
             .DistinctBy(link => link.Url, StringComparer.Ordinal)
@@ -68,9 +125,11 @@ public sealed class ReportComposer(TimeProvider timeProvider, EvidenceSourceRegi
             .Count();
         var unavailable = sources.Where(source => source.Health == SourceHealth.Unavailable).Select(source => source.Source).ToList();
         var causalEvents = BuildCausalEvents(evidence);
-        var summary = signalGroups == 0
-            ? "No high-signal anomalies were identified in the configured evidence window."
-            : $"Found {signalGroups} high-signal evidence group{(signalGroups == 1 ? "" : "s")} across {signalSources} source{(signalSources == 1 ? "" : "s")}.";
+        var summary = collectionOutcome is { Clarity.IsClear: false }
+            ? InconclusiveSummary(collectionOutcome, signalGroups, signalSources)
+            : signalGroups == 0
+                ? "No high-signal anomalies were identified in the configured evidence window."
+                : $"Found {signalGroups} high-signal evidence group{(signalGroups == 1 ? "" : "s")} across {signalSources} source{(signalSources == 1 ? "" : "s")}.";
         if (unavailable.Count > 0) summary += $" Unavailable sources: {string.Join(", ", unavailable)}.";
         if (causalEvents.Count > 1)
         {
@@ -83,6 +142,28 @@ public sealed class ReportComposer(TimeProvider timeProvider, EvidenceSourceRegi
             incident.Id, incident.PagerDutyIncidentId, incident.ServiceId, profile.Id, profileRevision,
             incident.Title, incident.Urgency, incident.State, status, incident.TriggeredAt,
             timeProvider.GetUtcNow(), incident.Version, summary, ai, timeline, evidence, sources, links, causalEvents, problem);
+    }
+
+    private static string InconclusiveSummary(
+        EvidenceCollectionOutcome outcome,
+        int signalGroups,
+        int signalSources)
+    {
+        var summary = outcome.CompletionReason switch
+        {
+            EvidenceCollectionCompletionReason.MaximumWindowReached =>
+                $"Evidence collection reached the bounded {outcome.FinalLookbackMinutes}-minute lookback without a clear deterministic result.",
+            EvidenceCollectionCompletionReason.NoExpandableConnectors =>
+                "Evidence collection completed without a clear deterministic result; no selected source supports wider historical search.",
+            EvidenceCollectionCompletionReason.NoConnectors =>
+                "Evidence collection completed without a clear deterministic result because no connector was selected.",
+            _ => "Evidence collection completed without a clear deterministic result."
+        };
+        if (signalGroups > 0)
+        {
+            summary += $" Retained {signalGroups} high-signal evidence group{(signalGroups == 1 ? "" : "s")} across {signalSources} source{(signalSources == 1 ? "" : "s")} for review.";
+        }
+        return summary;
     }
 
     private static string CausalLabel(string category) => category switch
@@ -145,6 +226,7 @@ public sealed class ReportComposer(TimeProvider timeProvider, EvidenceSourceRegi
             .GroupBy(TimelineIdentity, StringComparer.Ordinal)
             .Select(group => group
                 .OrderByDescending(item => TimelineSeverityRank(item.Severity))
+                .ThenByDescending(item => item.Url is not null)
                 .ThenBy(item => item.Url, StringComparer.Ordinal)
                 .ThenBy(item => item.Actor, StringComparer.Ordinal)
                 .ThenBy(item => item.ObjectType, StringComparer.Ordinal)

@@ -21,6 +21,13 @@ public enum SourceHealth
     Excluded
 }
 
+public enum SourceRequestState
+{
+    Requested,
+    Received,
+    Errored
+}
+
 public sealed record InvestigationContext(
     Guid IncidentId,
     string PagerDutyIncidentId,
@@ -211,7 +218,9 @@ public sealed record SourceReport(
     int FindingCount,
     long DurationMilliseconds,
     string? Diagnostic,
-    IReadOnlyList<SourceLink> Links);
+    IReadOnlyList<SourceLink> Links,
+    // Null only when deserializing a report persisted before request-state tracking.
+    SourceRequestState? RequestState);
 
 public sealed record AiSynthesis(
     string Status,
@@ -272,6 +281,7 @@ public sealed record PagerDutyWebhookEvent(
     string Title,
     string Urgency,
     string? HtmlUrl,
+    DateTimeOffset TriggeredAt,
     DateTimeOffset OccurredAt,
     IReadOnlyDictionary<string, string> Labels);
 

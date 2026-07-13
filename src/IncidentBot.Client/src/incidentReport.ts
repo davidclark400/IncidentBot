@@ -11,6 +11,7 @@ export type {
   ProblemOccurrence,
   SourceHealth,
   SourceLink as Link,
+  SourceRequestState,
   SourceReport as Source,
   TimelineEvent,
 } from './api-client/types.gen'

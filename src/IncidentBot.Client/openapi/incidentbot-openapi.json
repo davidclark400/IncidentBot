@@ -249,6 +249,144 @@
           }
         }
       }
+    },
+    "/api/pagerduty/incidents": {
+      "get": {
+        "tags": [
+          "PagerDutyPullApi"
+        ],
+        "operationId": "GetRecentPagerDutyIncidents",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecentPagerDutyIncidents"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pagerduty/incidents/{id}/trigger": {
+      "post": {
+        "tags": [
+          "PagerDutyPullApi"
+        ],
+        "operationId": "TriggerPagerDutyIncident",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentTriggerResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -780,6 +918,26 @@
           }
         }
       },
+      "IncidentTriggerResult": {
+        "required": [
+          "incidentId",
+          "incidentUrl",
+          "duplicate"
+        ],
+        "type": "object",
+        "properties": {
+          "incidentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "incidentUrl": {
+            "type": "string"
+          },
+          "duplicate": {
+            "type": "boolean"
+          }
+        }
+      },
       "IncidentUpdated": {
         "required": [
           "incidentId",
@@ -1107,6 +1265,42 @@
           }
         }
       },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "ProblemLifecycleState": {
         "enum": [
           "new",
@@ -1154,6 +1348,94 @@
           }
         }
       },
+      "RecentPagerDutyIncident": {
+        "required": [
+          "id",
+          "incidentNumber",
+          "title",
+          "status",
+          "urgency",
+          "createdAt",
+          "lastStatusChangeAt",
+          "serviceId",
+          "serviceName",
+          "assignees",
+          "htmlUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "incidentNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "urgency": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastStatusChangeAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "serviceId": {
+            "type": "string"
+          },
+          "serviceName": {
+            "type": "string"
+          },
+          "assignees": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "htmlUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RecentPagerDutyIncidents": {
+        "required": [
+          "since",
+          "until",
+          "hasMore",
+          "incidents"
+        ],
+        "type": "object",
+        "properties": {
+          "since": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "incidents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecentPagerDutyIncident"
+            }
+          }
+        }
+      },
       "SourceHealth": {
         "enum": [
           "pending",
@@ -1185,7 +1467,8 @@
           "findingCount",
           "durationMilliseconds",
           "diagnostic",
-          "links"
+          "links",
+          "requestState"
         ],
         "type": "object",
         "properties": {
@@ -1214,8 +1497,18 @@
             "items": {
               "$ref": "#/components/schemas/SourceLink"
             }
+          },
+          "requestState": {
+            "$ref": "#/components/schemas/SourceRequestState"
           }
         }
+      },
+      "SourceRequestState": {
+        "enum": [
+          "requested",
+          "received",
+          "errored"
+        ]
       },
       "TimelineEvent": {
         "required": [
@@ -1284,6 +1577,9 @@
     },
     {
       "name": "IncidentApi"
+    },
+    {
+      "name": "PagerDutyPullApi"
     }
   ]
 }

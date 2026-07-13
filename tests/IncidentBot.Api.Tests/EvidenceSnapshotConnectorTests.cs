@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using IncidentBot.Api.Connectors;
 using IncidentBot.Api.Domain;
+using IncidentBot.Api.Options;
 using IncidentBot.Api.Incidents;
 using IncidentBot.Api.Security;
 
@@ -39,12 +40,12 @@ public sealed class EvidenceSnapshotConnectorTests
                 }
                 """);
         });
+        var transport = Transport("https://grafana.example");
         var profile = new InvestigationProfile
         {
             Id = "profile",
             Grafana = new GrafanaScope
             {
-                Connector = Transport("https://grafana.example"),
                 OrganizationId = 42,
                 Queries =
                 [
@@ -59,7 +60,8 @@ public sealed class EvidenceSnapshotConnectorTests
             }
         };
         var connector = new GrafanaEvidenceConnector(
-            new StubHttpClientFactory(handler), new ThrowingMcpAdapter(), new SafeTemplateRenderer());
+            new StubHttpClientFactory(handler), new ThrowingMcpAdapter(), new SafeTemplateRenderer(),
+            TestConfiguration.EvidenceSources(grafana: transport), TestConfiguration.Credentials());
 
         var first = await connector.CollectAsync(Context(profile), Scope(FirstWindowEnd), CancellationToken.None);
         var second = await connector.CollectAsync(Context(profile), Scope(SecondWindowEnd), CancellationToken.None);
@@ -101,12 +103,12 @@ public sealed class EvidenceSnapshotConnectorTests
                 : $"{firstEvent}\n{secondEvent}";
             return Text(sample);
         });
+        var transport = Transport("https://logs.example");
         var profile = new InvestigationProfile
         {
             Id = "profile",
             VictoriaLogs = new VictoriaLogsScope
             {
-                Connector = Transport("https://logs.example"),
                 AccountId = "12",
                 ProjectId = "payments",
                 StreamFilters = new Dictionary<string, string> { ["environment"] = "production" },
@@ -121,7 +123,8 @@ public sealed class EvidenceSnapshotConnectorTests
             }
         };
         var connector = new VictoriaLogsEvidenceConnector(
-            new StubHttpClientFactory(handler), new ThrowingMcpAdapter(), new SafeTemplateRenderer());
+            new StubHttpClientFactory(handler), new ThrowingMcpAdapter(), new SafeTemplateRenderer(),
+            TestConfiguration.EvidenceSources(victoriaLogs: transport), TestConfiguration.Credentials());
 
         var first = await connector.CollectAsync(Context(profile), Scope(FirstWindowEnd), CancellationToken.None);
         var second = await connector.CollectAsync(Context(profile), Scope(SecondWindowEnd), CancellationToken.None);
@@ -176,13 +179,15 @@ public sealed class EvidenceSnapshotConnectorTests
                 }
                 """);
         });
+        var transport = Transport("https://pagerduty.example/api");
         var profile = new InvestigationProfile
         {
             Id = "profile",
-            PagerDuty = new PagerDutyScope { Connector = Transport("https://pagerduty.example/api") }
+            PagerDuty = new PagerDutyScope()
         };
         var connector = new PagerDutyEvidenceConnector(
-            new StubHttpClientFactory(handler), new ThrowingMcpAdapter());
+            new StubHttpClientFactory(handler), new ThrowingMcpAdapter(),
+            TestConfiguration.EvidenceSources(pagerDuty: transport), TestConfiguration.Credentials());
 
         var first = await connector.CollectAsync(Context(profile), Scope(FirstWindowEnd), CancellationToken.None);
         var second = await connector.CollectAsync(Context(profile), Scope(SecondWindowEnd), CancellationToken.None);
@@ -198,6 +203,49 @@ public sealed class EvidenceSnapshotConnectorTests
         var retained = Assert.Single(report.Evidence);
         Assert.Equal(secondIncident.Id, retained.Id);
         Assert.Equal(secondIncident.Summary, retained.Summary);
+    }
+
+    [Fact]
+    public async Task ResolvedPagerDutySnapshotProducesLifecycleTimeline()
+    {
+        var handler = new DelegateHandler(_ => Json("""
+            {
+              "incident": {
+                "id": "PD-1",
+                "status": "resolved",
+                "urgency": "high",
+                "created_at": "2026-07-11T10:00:00Z",
+                "last_status_change_at": "2026-07-11T10:20:00Z",
+                "html_url": "https://pagerduty.example/incidents/PD-1"
+              }
+            }
+            """));
+        var transport = Transport("https://pagerduty.example/api");
+        var profile = new InvestigationProfile
+        {
+            Id = "profile",
+            PagerDuty = new PagerDutyScope()
+        };
+        var connector = new PagerDutyEvidenceConnector(
+            new StubHttpClientFactory(handler), new ThrowingMcpAdapter(),
+            TestConfiguration.EvidenceSources(pagerDuty: transport), TestConfiguration.Credentials());
+
+        var result = await connector.CollectAsync(Context(profile), Scope(SecondWindowEnd), CancellationToken.None);
+
+        Assert.Equal(2, result.Timeline.Count);
+        Assert.Collection(
+            result.Timeline,
+            item =>
+            {
+                Assert.Equal("incident-triggered", item.Kind);
+                Assert.Equal(DateTimeOffset.Parse("2026-07-11T10:00:00Z"), item.OccurredAt);
+            },
+            item =>
+            {
+                Assert.Equal("incident-state", item.Kind);
+                Assert.Equal("PagerDuty incident resolved", item.Summary);
+                Assert.Equal(DateTimeOffset.Parse("2026-07-11T10:20:00Z"), item.OccurredAt);
+            });
     }
 
     [Fact]
@@ -230,18 +278,19 @@ public sealed class EvidenceSnapshotConnectorTests
             var evaluationStatus = secondCollection ? "canceled" : "blocked";
             return Json($$"""[{"ID":"eval-123","Status":"{{evaluationStatus}}","ModifyTime":"2026-07-11T10:03:00Z"}]""");
         });
+        var transport = Transport("https://nomad.example");
         var profile = new InvestigationProfile
         {
             Id = "profile",
             Nomad = new NomadScope
             {
-                Connector = Transport("https://nomad.example"),
                 Region = "global",
                 Namespaces = [new NomadNamespace { Name = "production", Jobs = ["payments"] }]
             }
         };
         var connector = new NomadEvidenceConnector(
-            new StubHttpClientFactory(handler), new ThrowingMcpAdapter());
+            new StubHttpClientFactory(handler), new ThrowingMcpAdapter(),
+            TestConfiguration.EvidenceSources(nomad: transport), TestConfiguration.Credentials());
 
         var first = await connector.CollectAsync(Context(profile), Scope(FirstWindowEnd), CancellationToken.None);
         var second = await connector.CollectAsync(Context(profile), Scope(SecondWindowEnd), CancellationToken.None);
@@ -264,7 +313,9 @@ public sealed class EvidenceSnapshotConnectorTests
     {
         var composer = new ReportComposer(
             TimeProvider.System,
-            new EvidenceSourceRegistry(Array.Empty<IIncidentEvidenceConnector>()));
+            new EvidenceSourceRegistry(
+                Array.Empty<IIncidentEvidenceConnector>(),
+                TestConfiguration.EvidenceSources()));
         var incident = new IncidentRecord(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
             "PD-1",
@@ -308,6 +359,7 @@ public sealed class EvidenceSnapshotConnectorTests
     {
         Mode = "api",
         BaseUrl = baseUrl,
+        CredentialEnv = "TEST_TOKEN",
         TimeoutSeconds = 5,
         MaxItems = 100,
         MaxBytes = 262144

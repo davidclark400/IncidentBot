@@ -22,6 +22,10 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__IncidentBot: Host=postgres;Port=5432;Database=incidentbot;Username=incidentbot;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      IncidentBot__RequireSlackForReadiness: "true"
+      PagerDuty__RequireSignature: "true"
+      IngressIdentity__Required: "true"
+      Slack__Enabled: "true"
     depends_on:
       postgres:
         condition: service_healthy

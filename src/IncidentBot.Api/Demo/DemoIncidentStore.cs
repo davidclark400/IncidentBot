@@ -225,5 +225,10 @@ public sealed class DemoIncidentStore(TimeProvider timeProvider) : IIncidentRepo
             new JsonObject { ["mode"] = "demo", ["fixture"] = id }, actor, objectType, objectId, codeReferences);
 
     private static SourceReport Source(string source, SourceHealth health, int count, long duration) =>
-        new(source, health, count, duration, null, []);
+        new(source, health, count, duration, null, [], health switch
+        {
+            SourceHealth.Pending => SourceRequestState.Requested,
+            SourceHealth.Unavailable => SourceRequestState.Errored,
+            _ => SourceRequestState.Received
+        });
 }

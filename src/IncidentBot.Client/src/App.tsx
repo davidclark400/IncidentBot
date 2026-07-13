@@ -1,5 +1,5 @@
-import { DemoLandingPage } from './features/demo/DemoLandingPage'
 import { IncidentPage } from './features/incidents/IncidentPage'
+import { RecentIncidentsPage } from './features/recent-incidents/RecentIncidentsPage'
 import { useTheme } from './hooks/useTheme'
 
 const incidentId = window.location.pathname.match(/^\/incidents\/([0-9a-f-]+)\/?$/i)?.[1]
@@ -9,7 +9,7 @@ function App() {
 
   return incidentId
     ? <IncidentPage incidentId={incidentId} theme={theme} />
-    : <DemoLandingPage theme={theme} />
+    : <RecentIncidentsPage theme={theme} />
 }
 
 export default App

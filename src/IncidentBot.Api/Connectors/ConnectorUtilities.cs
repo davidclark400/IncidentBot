@@ -6,6 +6,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using IncidentBot.Api.Domain;
+using IncidentBot.Api.Infrastructure;
+using IncidentBot.Api.Options;
 
 namespace IncidentBot.Api.Connectors;
 
@@ -39,12 +41,16 @@ internal static class ConnectorUtilities
             MaxBytes = Math.Min(Math.Max(0, scope.MaxBytes), Math.Max(0, transport.MaxBytes))
         };
 
-    public static HttpRequestMessage CreateRequest(HttpMethod method, string url, ConnectorTransport transport)
+    public static HttpRequestMessage CreateRequest(
+        HttpMethod method,
+        string url,
+        ConnectorTransport transport,
+        ICredentialProvider credentials)
     {
         var request = new HttpRequestMessage(method, url);
         var credential = string.IsNullOrWhiteSpace(transport.CredentialEnv)
             ? null
-            : Environment.GetEnvironmentVariable(transport.CredentialEnv);
+            : credentials.Get(transport.CredentialEnv);
         if (!string.IsNullOrWhiteSpace(credential))
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", credential);

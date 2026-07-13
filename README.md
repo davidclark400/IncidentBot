@@ -41,9 +41,9 @@ bash /tmp/dotnet-install.sh --channel 10.0 --install-dir "$HOME/.dotnet"
    docker compose up -d postgres
    ```
 
-2. Copy `.env.example` values into your secret manager or shell. Development disables PagerDuty signature and ingress identity requirements; integrations remain disabled or use placeholder internal hosts until configured.
+2. Export any integration credentials you need in your shell. `.env` is only loaded by the pilot Compose file; ASP.NET Core does not load it during `dotnet run`. Override deployment-specific endpoints with standard ASP.NET Core environment variables (for example, `EvidenceSources__Nomad__BaseUrl`). Development disables PagerDuty signature and ingress identity requirements; integrations use placeholder internal hosts until configured.
 
-3. Replace the example service IDs, URLs, resources, and query templates in `config/investigation-profiles.yaml`.
+3. Replace the example service IDs, resources, and query templates in `config/investigation-profiles.yaml`.
 
 4. Run the backend:
 
@@ -60,6 +60,17 @@ bash /tmp/dotnet-install.sh --channel 10.0 --install-dir "$HOME/.dotnet"
    ```
 
 The Vite server proxies API and SignalR traffic to port `5073`. A production frontend build is written to the API's `wwwroot`; `dotnet publish` runs `npm ci` and `npm run build` automatically.
+
+## Configuration
+
+Configuration has one precedence order and each file has one job:
+
+1. `src/IncidentBot.Api/appsettings.json` contains shared application defaults, including every evidence-source endpoint and transport. It also names the environment variables used for secrets; it never contains secret values.
+2. `appsettings.Development.json` supplies the local PostgreSQL connection and relaxes ingress checks for local development.
+3. Process environment variables override either file. ASP.NET Core maps a double underscore to a section separator, so `IncidentBot__PublicBaseUrl` overrides `IncidentBot:PublicBaseUrl`.
+4. `config/investigation-profiles.yaml` only selects evidence sources and contains reviewed service-specific allowlists, resources, selectors, and queries. Connector URLs and transports are rejected by the profile schema.
+
+`.env` is not read by the application. It is an ignored, machine-local input used by `compose.pilot.yaml` for secrets and deployment-specific overrides of the shared application settings. The Compose file passes those values into ASP.NET Core configuration and owns pilot policy such as enabling Slack and requiring it for readiness. Start from `.env.example` for a pilot deployment. For `dotnet run`, export the same variables in the shell or inject them with your development secret manager.
 
 ## Generated API contracts
 
@@ -137,8 +148,8 @@ docker build -t incident-bot:local .
 
 `compose.pilot.yaml` is a production-mode, single-machine starting point. It binds the API to loopback so a trusted reverse proxy can own TLS and identity, keeps PostgreSQL off the host network, runs the API with a read-only filesystem, and uses `/health/ready` rather than a TCP-only health check.
 
-1. Copy `.env.example` to `.env`, replace every `replace-me` value, set the external `IncidentBot__PublicBaseUrl`, and keep the file readable only by the deployment account.
-2. Replace every example service ID, channel, host, allowlist, resource, and query in `config/investigation-profiles.yaml`; then increment its `revision`.
+1. Copy `.env.example` to `.env`, replace every `replace-me` secret and `.example` endpoint, set the external `IncidentBot__PublicBaseUrl`, and keep the file readable only by the deployment account. `env_file` passes these standard ASP.NET Core override names directly to the application; the Compose YAML does not duplicate endpoint values. Pilot policy such as signature validation, ingress identity, and required Slack delivery comes from `compose.pilot.yaml` rather than `.env`.
+2. Replace every example service ID, channel, allowlist, resource, and query in `config/investigation-profiles.yaml`; then increment its `revision`.
 3. Configure the reverse proxy to:
    - terminate TLS;
    - remove any client-supplied `X-Forwarded-User` header before injecting the authenticated identity;
@@ -153,7 +164,7 @@ docker build -t incident-bot:local .
    curl --fail --show-error http://127.0.0.1:8080/health/ready
    ```
 
-Production readiness returns HTTP `503` and lists only missing environment-variable names and configuration issues until the deployment is safe to exercise. It checks the webhook secret, the required LiteLLM credential, enabled Slack credentials, profile connector credentials, ingress identity enforcement, the public URL, MCP consistency, and leftover `.example` connector hosts. Development continues to return HTTP `200` while showing the same production preflight diagnostically.
+Production readiness returns HTTP `503` and lists only missing environment-variable names and configuration issues until the deployment is safe to exercise. It checks the webhook secret, the LiteLLM credential when collection is enabled, enabled Slack credentials, active evidence-source credentials, ingress identity enforcement, the public URL, MCP consistency, and leftover `.example` hosts on active endpoints. Development continues to return HTTP `200` while showing the same production preflight diagnostically.
 
 For Slack delivery and restart actions, enable Socket Mode and interactivity, give the bot the minimum `chat:write` access needed for its target channels, and give the app-level token `connections:write`. Use read-only, resource-scoped tokens for PagerDuty and every evidence connector.
 
@@ -173,6 +184,8 @@ For a local unsigned smoke test, use `ASPNETCORE_ENVIRONMENT=Development` and se
 
 ## API and live updates
 
+- `GET /api/pagerduty/incidents?since={timestamp}&until={timestamp}` — pulls up to 100 recent triggered, acknowledged, and resolved PagerDuty incidents across a maximum 30-day window
+- `POST /api/pagerduty/incidents/{pagerDutyId}/trigger` — accepts the selected current PagerDuty event through the idempotent investigation workflow
 - `GET /api/incidents/{id}` — canonical report, with `ETag` equal to the report version
 - `GET /api/incidents/{id}/status` — collection state
 - `GET /api/incidents/{id}/timeline?offset=0&limit=100`
@@ -194,26 +207,28 @@ GitLab diff hunks under `relevantPaths` become immutable `CodeReference` values 
 
 ## MCP mode
 
-Any source connector can use an API or remote MCP implementation independently. Change that source's transport in the profile:
+Any source connector can use an API or remote MCP implementation independently. Change that source's application configuration; the profile continues to contain only its allowed resources:
 
-```yaml
-nomad:
-  connector:
-    mode: mcp
-    timeoutSeconds: 12
-    maxItems: 50
-    maxBytes: 131072
-    mcp:
-      serverUrl: https://mcp-gateway.internal.example/nomad
-      toolName: collect_incident_evidence
-      credentialEnv: NOMAD_MCP_TOKEN
-  region: global
-  namespaces:
-    - name: payments-production
-      jobs: [payments-api]
+```json
+{
+  "EvidenceSources": {
+    "Nomad": {
+      "Mode": "mcp",
+      "BaseUrl": "https://nomad.internal.example",
+      "TimeoutSeconds": 12,
+      "MaxItems": 50,
+      "MaxBytes": 131072,
+      "Mcp": {
+        "ServerUrl": "https://mcp-gateway.internal.example/nomad",
+        "ToolName": "collect_incident_evidence",
+        "CredentialEnv": "NOMAD_MCP_TOKEN"
+      }
+    }
+  }
+}
 ```
 
-Incident Bot initializes a Streamable HTTP session, verifies the configured tool is advertised, and sends only the fixed incident window, limits, and profile allowlist. The tool must return a JSON `ConnectorResult`. The LLM cannot select tools, arguments, hosts, or resources.
+Incident Bot initializes a Streamable HTTP session, verifies the configured tool is advertised, and sends only the policy-selected evidence window, limits, and profile allowlist. Collection starts at `IncidentBot:EvidenceWindowMinutes` (30 by default) and queries disjoint older rings up to `IncidentBot:EvidenceMaximumWindowMinutes` (240 by default) while the evidence remains deterministically inconclusive. Collection stops for a structured explicit failure, temporally close high-signal findings from distinct sources, or a change preceding a recent failure signal; otherwise it records a bounded inconclusive outcome. The tool must return a JSON `ConnectorResult`. The LLM cannot select tools, arguments, hosts, or resources.
 
 ## Verification
 
@@ -234,7 +249,7 @@ The Playwright suite builds the client and starts the API in database-free demo 
 - Configure LiteLLM and its required `LITELLM_API_KEY`; every collected investigation attempts synthesis. Enable Slack explicitly when Slack delivery is required.
 - Set `IncidentBot:PublicBaseUrl` to the ingress URL used in Slack.
 - Keep `IngressIdentity:Required=true` and configure the proxy to remove incoming identity headers before injecting its trusted one.
-- Store all token values outside YAML; profiles contain environment-variable names only.
+- Store all token values in the deployment secret mechanism. `appsettings.json` contains only credential environment-variable names, and profile YAML contains no connector configuration.
 - Give every connector read-only, resource-scoped credentials.
 - Review profile changes through Git and increment the profile revision.
 - Back up PostgreSQL before schema upgrades and test the restore procedure before the pilot.

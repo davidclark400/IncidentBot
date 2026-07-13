@@ -1,10 +1,12 @@
 using IncidentBot.Api.Domain;
+using IncidentBot.Api.Options;
 
 namespace IncidentBot.Api.Connectors;
 
 public interface IIncidentEvidenceConnector
 {
     string Source { get; }
+    bool SupportsWindowExpansion => false;
     Task<ConnectorResult> CollectAsync(
         InvestigationContext context,
         EvidenceScope scope,

@@ -19,7 +19,7 @@
 </g>
 <g>
   <rect x="240" y="160" width="1440" height="130" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
-  <text font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="960" y="219.3">Shared input: profile-scoped service + safe labels • window = triggeredAt − 30 min through now • max items/bytes • profile revision</tspan><tspan x="960" y="244.3">Each enabled connector runs concurrently using native API or configured MCP transport.</tspan></text>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="960" y="219.3">Shared input: scoped service + safe labels • disjoint rings = 0–30→30–60→60–120→120–240 min • max items/bytes • profile revision</tspan><tspan x="960" y="244.3">Window-sensitive connectors run concurrently until deterministic clarity or a bounded inconclusive outcome.</tspan></text>
 </g>
 <g>
   <rect x="40" y="360" width="350" height="390" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>

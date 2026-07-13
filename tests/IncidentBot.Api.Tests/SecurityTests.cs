@@ -14,24 +14,18 @@ public sealed class SecurityTests
         const string envName = "INCIDENTBOT_TEST_PD_SECRET";
         const string secret = "test-secret";
         var payload = Encoding.UTF8.GetBytes("{\"event\":{}}");
-        Environment.SetEnvironmentVariable(envName, secret);
-        try
-        {
-            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
-            var signature = "v1=" + Convert.ToHexStringLower(hmac.ComputeHash(payload));
-            var validator = new PagerDutySignatureValidator(Microsoft.Extensions.Options.Options.Create(new PagerDutyOptions
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+        var signature = "v1=" + Convert.ToHexStringLower(hmac.ComputeHash(payload));
+        var validator = new PagerDutySignatureValidator(
+            Microsoft.Extensions.Options.Options.Create(new PagerDutyOptions
             {
                 WebhookSecretEnv = envName,
                 RequireSignature = true
-            }));
+            }),
+            TestConfiguration.Credentials((envName, secret)));
 
-            Assert.True(validator.Validate(payload, signature));
-            Assert.False(validator.Validate(payload, "v1=" + new string('0', 64)));
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable(envName, null);
-        }
+        Assert.True(validator.Validate(payload, signature));
+        Assert.False(validator.Validate(payload, "v1=" + new string('0', 64)));
     }
 
     [Fact]

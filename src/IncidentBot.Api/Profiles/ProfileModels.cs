@@ -2,9 +2,9 @@ namespace IncidentBot.Api.Domain;
 
 public sealed class ProfileDocument
 {
-    public int Version { get; init; } = 1;
-    public string Revision { get; init; } = "development";
-    public string FallbackSlackChannel { get; init; } = "#incidents";
+    public int Version { get; init; }
+    public string Revision { get; init; } = "";
+    public string FallbackSlackChannel { get; init; } = "";
     public List<InvestigationProfile> Profiles { get; init; } = [];
 }
 
@@ -28,32 +28,12 @@ public sealed class ProfileSelector
     public Dictionary<string, string> Labels { get; init; } = [];
 }
 
-public sealed class ConnectorTransport
-{
-    public string Mode { get; init; } = "api";
-    public string BaseUrl { get; init; } = "";
-    public string CredentialEnv { get; init; } = "";
-    public int TimeoutSeconds { get; init; } = 15;
-    public int MaxItems { get; init; } = 50;
-    public int MaxBytes { get; init; } = 131072;
-    public McpToolConfiguration? Mcp { get; init; }
-}
-
-public sealed class McpToolConfiguration
-{
-    public string ServerUrl { get; init; } = "";
-    public string ToolName { get; init; } = "";
-    public string CredentialEnv { get; init; } = "";
-}
-
 public sealed class PagerDutyScope
 {
-    public ConnectorTransport Connector { get; init; } = new();
 }
 
 public sealed class NomadScope
 {
-    public ConnectorTransport Connector { get; init; } = new();
     public string Region { get; init; } = "global";
     public List<NomadNamespace> Namespaces { get; init; } = [];
 }
@@ -66,7 +46,6 @@ public sealed class NomadNamespace
 
 public sealed class GitLabScope
 {
-    public ConnectorTransport Connector { get; init; } = new();
     public List<GitLabProject> Projects { get; init; } = [];
 }
 
@@ -80,7 +59,6 @@ public sealed class GitLabProject
 
 public sealed class GrafanaScope
 {
-    public ConnectorTransport Connector { get; init; } = new();
     public int OrganizationId { get; init; } = 1;
     public List<GrafanaDashboard> Dashboards { get; init; } = [];
     public List<GrafanaQuery> Queries { get; init; } = [];
@@ -103,7 +81,6 @@ public sealed class GrafanaQuery
 
 public sealed class VictoriaLogsScope
 {
-    public ConnectorTransport Connector { get; init; } = new();
     public string AccountId { get; init; } = "0";
     public string ProjectId { get; init; } = "0";
     public Dictionary<string, string> StreamFilters { get; init; } = [];
@@ -117,8 +94,3 @@ public sealed class VictoriaLogsQuery
     public string Name { get; init; } = "";
     public string Expression { get; init; } = "";
 }
-
-public sealed record ConfiguredEvidenceSource(
-    string Source,
-    ConnectorTransport Transport,
-    IReadOnlyList<string> ProfileIds);

@@ -5,12 +5,16 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using IncidentBot.Api.Domain;
 using IncidentBot.Api.Incidents;
+using IncidentBot.Api.Infrastructure;
+using IncidentBot.Api.Options;
 
 namespace IncidentBot.Api.Connectors;
 
 public sealed partial class GitLabEvidenceConnector(
     IHttpClientFactory httpClientFactory,
-    IMcpEvidenceAdapter mcp) : IIncidentEvidenceConnector
+    IMcpEvidenceAdapter mcp,
+    EvidenceSourceConfiguration evidenceSources,
+    ICredentialProvider credentials) : IIncidentEvidenceConnector
 {
     private const int MaximumPipelineJobFindings = 10;
     private const int MaximumTraceExcerptCharacters = 6000;
@@ -18,13 +22,15 @@ public sealed partial class GitLabEvidenceConnector(
     private const int MaximumPaginationPages = 100;
 
     public string Source => EvidenceSourceRegistry.GitLab;
+    public bool SupportsWindowExpansion => true;
 
     public Task<ConnectorResult> CollectAsync(InvestigationContext context, EvidenceScope scope, CancellationToken cancellationToken)
     {
         var configuration = context.Profile.GitLab;
         if (configuration is null) return Task.FromResult(ConnectorResult.Excluded(Source));
+        var transport = evidenceSources.For(Source);
         return ConnectorUtilities.CollectAsync(
-            Source, configuration.Connector, mcp, context, scope,
+            Source, transport, mcp, context, scope,
             new { projects = configuration.Projects, includePipelineJobOutput = true }, async ct =>
         {
             var findings = new List<EvidenceFinding>();
@@ -32,7 +38,7 @@ public sealed partial class GitLabEvidenceConnector(
             var links = new List<SourceLink>();
             var diagnostics = new List<string>();
             var failedPipelines = new List<GitLabPipelineTarget>();
-            var sourceMaximumItems = Math.Max(0, Math.Min(scope.MaxItems, configuration.Connector.MaxItems));
+            var sourceMaximumItems = Math.Max(0, Math.Min(scope.MaxItems, transport.MaxItems));
             var reservedContextItems = sourceMaximumItems switch
             {
                 <= 1 => 0,
@@ -42,7 +48,7 @@ public sealed partial class GitLabEvidenceConnector(
             var maximumPipelineJobFindings = Math.Min(
                 Math.Max(0, sourceMaximumItems - reservedContextItems),
                 MaximumPipelineJobFindings);
-            var sourceMaximumBytes = Math.Max(0, Math.Min(scope.MaxBytes, configuration.Connector.MaxBytes));
+            var sourceMaximumBytes = Math.Max(0, Math.Min(scope.MaxBytes, transport.MaxBytes));
             var jobMetadataBytes = maximumPipelineJobFindings > 0 ? sourceMaximumBytes * 35 / 100 : 0;
             var maximumTraceBytes = maximumPipelineJobFindings > 0 ? sourceMaximumBytes * 30 / 100 : 0;
             var pipelineMetadataBytes = maximumPipelineJobFindings > 0
@@ -58,9 +64,9 @@ public sealed partial class GitLabEvidenceConnector(
                 var encodedProject = Uri.EscapeDataString(project.Id);
                 var since = Uri.EscapeDataString(ConnectorUtilities.Iso(scope.Start));
                 var until = Uri.EscapeDataString(ConnectorUtilities.Iso(scope.End));
-                var mergeRequestsUrl = ConnectorUtilities.Url(configuration.Connector,
-                    $"api/v4/projects/{encodedProject}/merge_requests?scope=all&state=merged&updated_after={since}&per_page={Math.Min(scope.MaxItems, configuration.Connector.MaxItems)}");
-                using (var mergeRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, mergeRequestsUrl, configuration.Connector))
+                var mergeRequestsUrl = ConnectorUtilities.Url(transport,
+                    $"api/v4/projects/{encodedProject}/merge_requests?scope=all&state=merged&updated_after={since}&per_page={Math.Min(scope.MaxItems, transport.MaxItems)}");
+                using (var mergeRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, mergeRequestsUrl, transport, credentials))
                 using (var mergeResponse = await httpClientFactory.CreateClient().SendAsync(
                            mergeRequest, HttpCompletionOption.ResponseHeadersRead, ct))
                 {
@@ -103,15 +109,15 @@ public sealed partial class GitLabEvidenceConnector(
                     }
                 }
 
-                var commitsUrl = ConnectorUtilities.Url(configuration.Connector,
-                    $"api/v4/projects/{encodedProject}/repository/commits?ref_name={Uri.EscapeDataString(project.Branch)}&since={since}&until={until}&per_page={Math.Min(scope.MaxItems, configuration.Connector.MaxItems)}");
-                using var commitRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, commitsUrl, configuration.Connector);
+                var commitsUrl = ConnectorUtilities.Url(transport,
+                    $"api/v4/projects/{encodedProject}/repository/commits?ref_name={Uri.EscapeDataString(project.Branch)}&since={since}&until={until}&per_page={Math.Min(scope.MaxItems, transport.MaxItems)}");
+                using var commitRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, commitsUrl, transport, credentials);
                 using var commitResponse = await httpClientFactory.CreateClient().SendAsync(
                     commitRequest, HttpCompletionOption.ResponseHeadersRead, ct);
                 using var commitJson = await ReadBudgetedJsonAsync(
                     commitResponse, contextBudget, $"Commits for {project.Id}", diagnostics, ct);
                 foreach (var commit in commitJson?.RootElement.EnumerateArray()
-                             .Take(Math.Min(5, configuration.Connector.MaxItems)) ?? [])
+                             .Take(Math.Min(5, transport.MaxItems)) ?? [])
                 {
                     var id = ConnectorUtilities.Text(commit, "id");
                     var shortId = ConnectorUtilities.Text(commit, "short_id", id[..Math.Min(8, id.Length)]);
@@ -125,9 +131,9 @@ public sealed partial class GitLabEvidenceConnector(
                         ConnectorUtilities.Provenance("GET repository/commits", new { project = project.Id, project.Branch })));
                     timeline.Add(new TimelineCandidate(at, Source, "commit", summary, "info", url));
 
-                    var diffUrl = ConnectorUtilities.Url(configuration.Connector,
+                    var diffUrl = ConnectorUtilities.Url(transport,
                         $"api/v4/projects/{encodedProject}/repository/commits/{Uri.EscapeDataString(id)}/diff?per_page=30");
-                    using var diffRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, diffUrl, configuration.Connector);
+                    using var diffRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, diffUrl, transport, credentials);
                     using var diffResponse = await httpClientFactory.CreateClient().SendAsync(
                         diffRequest, HttpCompletionOption.ResponseHeadersRead, ct);
                     using var diffJson = await ReadBudgetedJsonAsync(
@@ -141,7 +147,7 @@ public sealed partial class GitLabEvidenceConnector(
                     {
                         var changedPaths = relevantDiffs.Select(diff => ConnectorUtilities.Text(diff, "new_path")).Distinct().ToList();
                         var codeReferences = ExtractCodeReferences(
-                            configuration.Connector.BaseUrl, project.Id, id, relevantDiffs);
+                            transport.BaseUrl, project.Id, id, relevantDiffs);
                         var excerpt = string.Join("\n\n", relevantDiffs.Select(diff =>
                             $"--- {ConnectorUtilities.Text(diff, "new_path")}\n{ConnectorUtilities.Text(diff, "diff", "")}"));
                         findings.Add(new EvidenceFinding(
@@ -157,17 +163,17 @@ public sealed partial class GitLabEvidenceConnector(
                     }
                 }
 
-                var pipelinesUrl = ConnectorUtilities.Url(configuration.Connector,
+                var pipelinesUrl = ConnectorUtilities.Url(transport,
                     $"api/v4/projects/{encodedProject}/pipelines?ref={Uri.EscapeDataString(project.Branch)}&updated_after={since}&updated_before={until}&per_page={GitLabPageSize}");
                 var pipelineItems = await ReadPaginatedJsonArrayAsync(
-                    httpClientFactory.CreateClient(), configuration.Connector, pipelinesUrl,
+                    httpClientFactory.CreateClient(), transport, pipelinesUrl,
                     $"Pipelines for {project.Id}", diagnostics, pipelineBudget, ct);
-                var childPipelinesUrl = ConnectorUtilities.Url(configuration.Connector,
+                var childPipelinesUrl = ConnectorUtilities.Url(transport,
                     $"api/v4/projects/{encodedProject}/pipelines?source=parent_pipeline&ref={Uri.EscapeDataString(project.Branch)}&updated_after={since}&updated_before={until}&per_page={GitLabPageSize}");
                 try
                 {
                     pipelineItems.AddRange(await ReadPaginatedJsonArrayAsync(
-                        httpClientFactory.CreateClient(), configuration.Connector, childPipelinesUrl,
+                        httpClientFactory.CreateClient(), transport, childPipelinesUrl,
                         $"Child pipelines for {project.Id}", diagnostics, pipelineBudget, ct));
                 }
                 catch (OperationCanceledException)
@@ -213,9 +219,9 @@ public sealed partial class GitLabEvidenceConnector(
 
                 foreach (var environment in project.Environments)
                 {
-                    var deploymentsUrl = ConnectorUtilities.Url(configuration.Connector,
-                        $"api/v4/projects/{encodedProject}/deployments?environment={Uri.EscapeDataString(environment)}&updated_after={since}&updated_before={until}&per_page={Math.Min(scope.MaxItems, configuration.Connector.MaxItems)}");
-                    using var deploymentRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, deploymentsUrl, configuration.Connector);
+                    var deploymentsUrl = ConnectorUtilities.Url(transport,
+                        $"api/v4/projects/{encodedProject}/deployments?environment={Uri.EscapeDataString(environment)}&updated_after={since}&updated_before={until}&per_page={Math.Min(scope.MaxItems, transport.MaxItems)}");
+                    using var deploymentRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, deploymentsUrl, transport, credentials);
                     using var deploymentResponse = await httpClientFactory.CreateClient().SendAsync(
                         deploymentRequest, HttpCompletionOption.ResponseHeadersRead, ct);
                     using var deploymentJson = await ReadBudgetedJsonAsync(
@@ -235,7 +241,13 @@ public sealed partial class GitLabEvidenceConnector(
                             ConnectorUtilities.Id(Source, project.Id, environment, deploymentId), Source, at, null,
                             "deployment", status == "success" ? "info" : "warning", summary,
                             ConnectorUtilities.Truncate(deployment.ToString(), 1000), deploymentsUrl, 0.95,
-                            ConnectorUtilities.Provenance("GET deployments", new { project = project.Id, environment, sha }),
+                            ConnectorUtilities.Provenance("GET deployments", new
+                            {
+                                project = project.Id,
+                                environment,
+                                sha,
+                                status
+                            }),
                             actor, "commit", string.IsNullOrWhiteSpace(sha) ? deploymentId : sha));
                         timeline.Add(new TimelineCandidate(at, Source, "deployment", summary,
                             status == "success" ? "info" : "warning", deploymentsUrl,
@@ -244,11 +256,11 @@ public sealed partial class GitLabEvidenceConnector(
                 }
 
                 links.Add(new SourceLink($"GitLab {project.Id}",
-                    $"{configuration.Connector.BaseUrl.TrimEnd('/')}/{project.Id.TrimStart('/')}"));
+                    $"{transport.BaseUrl.TrimEnd('/')}/{project.Id.TrimStart('/')}"));
                 foreach (var path in project.RelevantPaths)
                 {
                     links.Add(new SourceLink($"Code: {path}",
-                        $"{configuration.Connector.BaseUrl.TrimEnd('/')}/{project.Id.TrimStart('/')}/-/tree/{Uri.EscapeDataString(project.Branch)}/{path.TrimStart('/')}"));
+                        $"{transport.BaseUrl.TrimEnd('/')}/{project.Id.TrimStart('/')}/-/tree/{Uri.EscapeDataString(project.Branch)}/{path.TrimStart('/')}"));
                 }
             }
 
@@ -266,7 +278,7 @@ public sealed partial class GitLabEvidenceConnector(
                         $"Pipeline job discovery limited to {pipelineDiscoveryLimit} of {rankedPipelineCandidates.Count} failed or canceled pipelines");
                 }
                 var jobOutput = await CollectPipelineJobOutputAsync(
-                    httpClientFactory.CreateClient(), configuration.Connector,
+                    httpClientFactory.CreateClient(), transport,
                     rankedPipelineCandidates.Take(pipelineDiscoveryLimit).ToList(),
                     maximumPipelineJobFindings, maximumTraceBytes, scope.End, jobBudget, ct);
                 findings.AddRange(jobOutput.Findings);
@@ -340,7 +352,7 @@ public sealed partial class GitLabEvidenceConnector(
         }, cancellationToken);
     }
 
-    private static async Task<PipelineJobOutput> CollectPipelineJobOutputAsync(
+    private async Task<PipelineJobOutput> CollectPipelineJobOutputAsync(
         HttpClient client,
         ConnectorTransport connector,
         IReadOnlyList<GitLabPipelineTarget> pipelines,
@@ -503,7 +515,7 @@ public sealed partial class GitLabEvidenceConnector(
         return new PipelineJobOutput(findings, timeline, diagnostics);
     }
 
-    private static async Task<PipelineJobDiscovery> DiscoverPipelineJobsAsync(
+    private async Task<PipelineJobDiscovery> DiscoverPipelineJobsAsync(
         HttpClient client,
         ConnectorTransport connector,
         GitLabPipelineTarget pipeline,
@@ -582,7 +594,7 @@ public sealed partial class GitLabEvidenceConnector(
         return new PipelineJobDiscovery(pipeline, activeFamilies);
     }
 
-    private static async Task<List<JsonElement>> ReadFilteredPipelineJobsAsync(
+    private async Task<List<JsonElement>> ReadFilteredPipelineJobsAsync(
         HttpClient client,
         ConnectorTransport connector,
         GitLabPipelineTarget pipeline,
@@ -605,7 +617,7 @@ public sealed partial class GitLabEvidenceConnector(
                 $"api/v4/projects/{pipeline.EncodedProject}/pipelines/{Uri.EscapeDataString(pipeline.PipelineId)}/jobs"
                 + $"?scope%5B%5D={Uri.EscapeDataString(jobStatus)}&include_retried={includeRetried.ToString().ToLowerInvariant()}"
                 + $"&per_page={GitLabPageSize}&page={page}");
-            using var jobsRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, jobsUrl, connector);
+            using var jobsRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, jobsUrl, connector, credentials);
             using var jobsResponse = await client.SendAsync(
                 jobsRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             JsonDocument jobsJson;
@@ -642,7 +654,7 @@ public sealed partial class GitLabEvidenceConnector(
         return jobs;
     }
 
-    private static GitLabJob ParseJob(
+    private GitLabJob ParseJob(
         JsonElement job,
         GitLabPipelineTarget pipeline,
         ConnectorTransport connector,
@@ -717,14 +729,14 @@ public sealed partial class GitLabEvidenceConnector(
             .ToList();
     }
 
-    private static async Task<TraceReadResult> FetchUsefulTraceTailAsync(
+    private async Task<TraceReadResult> FetchUsefulTraceTailAsync(
         HttpClient client,
         ConnectorTransport connector,
         string traceUrl,
         TraceBudget budget,
         CancellationToken cancellationToken)
     {
-        using (var traceRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, traceUrl, connector))
+        using (var traceRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, traceUrl, connector, credentials))
         {
             traceRequest.Headers.Range = new RangeHeaderValue(null, budget.RetainedBytes);
             using var traceResponse = await client.SendAsync(
@@ -751,7 +763,7 @@ public sealed partial class GitLabEvidenceConnector(
 
         // An unverified 206 cannot be assumed to contain the suffix. Retry without Range and
         // calculate the tail locally with bounded memory.
-        using var fallbackRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, traceUrl, connector);
+        using var fallbackRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, traceUrl, connector, credentials);
         using var fallbackResponse = await client.SendAsync(
             fallbackRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         fallbackResponse.EnsureSuccessStatusCode();
@@ -862,7 +874,7 @@ public sealed partial class GitLabEvidenceConnector(
         }
     }
 
-    private static async Task<List<JsonElement>> ReadPaginatedJsonArrayAsync(
+    private async Task<List<JsonElement>> ReadPaginatedJsonArrayAsync(
         HttpClient client,
         ConnectorTransport connector,
         string url,
@@ -881,7 +893,7 @@ public sealed partial class GitLabEvidenceConnector(
                 break;
             }
             using var request = ConnectorUtilities.CreateRequest(
-                HttpMethod.Get, $"{url}&page={page}", connector);
+                HttpMethod.Get, $"{url}&page={page}", connector, credentials);
             using var response = await client.SendAsync(
                 request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             JsonDocument json;
@@ -926,7 +938,7 @@ public sealed partial class GitLabEvidenceConnector(
         return itemCount == GitLabPageSize ? currentPage + 1 : null;
     }
 
-    private static string? PrepareTraceExcerpt(string trace, ConnectorTransport connector)
+    private string? PrepareTraceExcerpt(string trace, ConnectorTransport connector)
     {
         if (string.IsNullOrWhiteSpace(trace)) return null;
         var cleaned = RedactSensitiveText(trace, connector).Trim();
@@ -937,7 +949,7 @@ public sealed partial class GitLabEvidenceConnector(
         return cleaned;
     }
 
-    private static string PrepareMetadata(string value, ConnectorTransport connector)
+    private string PrepareMetadata(string value, ConnectorTransport connector)
     {
         var cleaned = RedactSensitiveText(value, connector)
             .Replace('\r', ' ')
@@ -946,7 +958,7 @@ public sealed partial class GitLabEvidenceConnector(
         return ConnectorUtilities.Truncate(cleaned, 300);
     }
 
-    private static string RedactSensitiveText(string value, ConnectorTransport connector)
+    private string RedactSensitiveText(string value, ConnectorTransport connector)
     {
         var cleaned = AnsiEscape().Replace(value, "");
         cleaned = ControlCharacter().Replace(cleaned, "");
@@ -956,7 +968,7 @@ public sealed partial class GitLabEvidenceConnector(
         cleaned = JsonWebToken().Replace(cleaned, "[REDACTED]");
         var credential = string.IsNullOrWhiteSpace(connector.CredentialEnv)
             ? null
-            : Environment.GetEnvironmentVariable(connector.CredentialEnv);
+            : credentials.Get(connector.CredentialEnv);
         if (!string.IsNullOrWhiteSpace(credential))
         {
             cleaned = cleaned.Replace(credential, "[REDACTED]", StringComparison.Ordinal);

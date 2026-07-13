@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using IncidentBot.Api.Domain;
 using IncidentBot.Api.Incidents;
+using IncidentBot.Api.Infrastructure;
 using IncidentBot.Api.Security;
 
 namespace IncidentBot.Api.Connectors;
@@ -9,16 +10,20 @@ namespace IncidentBot.Api.Connectors;
 public sealed class VictoriaLogsEvidenceConnector(
     IHttpClientFactory httpClientFactory,
     IMcpEvidenceAdapter mcp,
-    SafeTemplateRenderer templates) : IIncidentEvidenceConnector
+    SafeTemplateRenderer templates,
+    EvidenceSourceConfiguration evidenceSources,
+    ICredentialProvider credentials) : IIncidentEvidenceConnector
 {
     public string Source => EvidenceSourceRegistry.VictoriaLogs;
+    public bool SupportsWindowExpansion => true;
 
     public Task<ConnectorResult> CollectAsync(InvestigationContext context, EvidenceScope scope, CancellationToken cancellationToken)
     {
         var configuration = context.Profile.VictoriaLogs;
         if (configuration is null) return Task.FromResult(ConnectorResult.Excluded(Source));
+        var transport = evidenceSources.For(Source);
         return ConnectorUtilities.CollectAsync(
-            Source, configuration.Connector, mcp, context, scope,
+            Source, transport, mcp, context, scope,
             new
             {
                 configuration.AccountId,
@@ -38,7 +43,7 @@ public sealed class VictoriaLogsEvidenceConnector(
                 .ThenBy(pair => pair.Value, StringComparer.Ordinal));
             var budget = new ConnectorByteBudget(
                 scope.MaxBytes,
-                configuration.Connector.MaxBytes,
+                transport.MaxBytes,
                 configuration.Queries.Count * 2);
             var queriesWithSamples = new List<(
                 VictoriaLogsQuery Configuration,
@@ -59,7 +64,7 @@ public sealed class VictoriaLogsEvidenceConnector(
                     ["end"] = ConnectorUtilities.Iso(scope.End),
                     ["extra_stream_filters"] = streamFilters
                 };
-                var hitsUrl = ConnectorUtilities.Url(configuration.Connector, "select/logsql/hits");
+                var hitsUrl = ConnectorUtilities.Url(transport, "select/logsql/hits");
                 var hitsOperation = $"POST /select/logsql/hits ({configuredQuery.Name})";
                 var hitsAllowance = budget.BeginOperation(hitsOperation);
                 if (hitsAllowance <= 0)
@@ -72,7 +77,7 @@ public sealed class VictoriaLogsEvidenceConnector(
                 try
                 {
                     using var hitsRequest = ConnectorUtilities.CreateRequest(
-                        HttpMethod.Post, hitsUrl, configuration.Connector);
+                        HttpMethod.Post, hitsUrl, transport, credentials);
                     hitsRequest.Headers.TryAddWithoutValidation("AccountID", configuration.AccountId);
                     hitsRequest.Headers.TryAddWithoutValidation("ProjectID", configuration.ProjectId);
                     hitsRequest.Content = new FormUrlEncodedContent(common.Concat(new[]
@@ -115,6 +120,7 @@ public sealed class VictoriaLogsEvidenceConnector(
                         configuration.AccountId,
                         configuration.ProjectId,
                         configuration.StreamFilters,
+                        matchCount = total,
                         exactWindowStart = scope.Start,
                         exactWindowEnd = scope.End
                     }), ObjectType: "log-query", ObjectId: configuredQuery.Name));
@@ -130,13 +136,13 @@ public sealed class VictoriaLogsEvidenceConnector(
 
             foreach (var prepared in queriesWithSamples)
             {
-                var sampleLimit = Math.Min(configuration.Connector.MaxItems, 20);
+                var sampleLimit = Math.Min(transport.MaxItems, 20);
                 var sampleExpression = $"{prepared.Query} | fields {string.Join(", ", configuration.Fields)} | sort by (_time) | limit {sampleLimit}";
                 var sampleForm = new Dictionary<string, string>(prepared.Common)
                 {
                     ["query"] = sampleExpression
                 };
-                var queryUrl = ConnectorUtilities.Url(configuration.Connector, "select/logsql/query");
+                var queryUrl = ConnectorUtilities.Url(transport, "select/logsql/query");
                 var sampleOperation = $"POST /select/logsql/query ({prepared.Configuration.Name})";
                 var sampleAllowance = budget.BeginOperation(sampleOperation);
                 if (sampleAllowance <= 0) continue;
@@ -144,7 +150,7 @@ public sealed class VictoriaLogsEvidenceConnector(
                 try
                 {
                     using var sampleRequest = ConnectorUtilities.CreateRequest(
-                        HttpMethod.Post, queryUrl, configuration.Connector);
+                        HttpMethod.Post, queryUrl, transport, credentials);
                     sampleRequest.Headers.TryAddWithoutValidation("AccountID", configuration.AccountId);
                     sampleRequest.Headers.TryAddWithoutValidation("ProjectID", configuration.ProjectId);
                     sampleRequest.Content = new FormUrlEncodedContent(sampleForm);
@@ -205,7 +211,7 @@ public sealed class VictoriaLogsEvidenceConnector(
 
             var itemLimit = Math.Min(
                 Math.Max(0, scope.MaxItems),
-                Math.Max(0, configuration.Connector.MaxItems));
+                Math.Max(0, transport.MaxItems));
             var rankedFindings = EvidenceRankingPolicy.Rank(findings, context.TriggeredAt);
             var orderedTimeline = timeline.OrderBy(item => item.OccurredAt).ToList();
             var distinctLinks = links.Distinct().ToList();

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using IncidentBot.Api.Domain;
 using IncidentBot.Api.Incidents;
+using IncidentBot.Api.Infrastructure;
 using IncidentBot.Api.Security;
 
 namespace IncidentBot.Api.Connectors;
@@ -10,16 +11,20 @@ namespace IncidentBot.Api.Connectors;
 public sealed class GrafanaEvidenceConnector(
     IHttpClientFactory httpClientFactory,
     IMcpEvidenceAdapter mcp,
-    SafeTemplateRenderer templates) : IIncidentEvidenceConnector
+    SafeTemplateRenderer templates,
+    EvidenceSourceConfiguration evidenceSources,
+    ICredentialProvider credentials) : IIncidentEvidenceConnector
 {
     public string Source => EvidenceSourceRegistry.Grafana;
+    public bool SupportsWindowExpansion => true;
 
     public Task<ConnectorResult> CollectAsync(InvestigationContext context, EvidenceScope scope, CancellationToken cancellationToken)
     {
         var configuration = context.Profile.Grafana;
         if (configuration is null) return Task.FromResult(ConnectorResult.Excluded(Source));
+        var transport = evidenceSources.For(Source);
         return ConnectorUtilities.CollectAsync(
-            Source, configuration.Connector, mcp, context, scope,
+            Source, transport, mcp, context, scope,
             new
             {
                 configuration.OrganizationId,
@@ -36,12 +41,12 @@ public sealed class GrafanaEvidenceConnector(
             var toMilliseconds = scope.End.ToUnixTimeMilliseconds();
             var budget = new ConnectorByteBudget(
                 scope.MaxBytes,
-                configuration.Connector.MaxBytes,
+                transport.MaxBytes,
                 1 + configuration.Queries.Count);
 
             foreach (var dashboard in configuration.Dashboards)
             {
-                var baseLink = $"{configuration.Connector.BaseUrl.TrimEnd('/')}/d/{Uri.EscapeDataString(dashboard.Uid)}?from={fromMilliseconds}&to={toMilliseconds}";
+                var baseLink = $"{transport.BaseUrl.TrimEnd('/')}/d/{Uri.EscapeDataString(dashboard.Uid)}?from={fromMilliseconds}&to={toMilliseconds}";
                 links.Add(new SourceLink($"Grafana dashboard {dashboard.Uid}", baseLink));
                 foreach (var panelId in dashboard.PanelIds)
                 {
@@ -51,10 +56,10 @@ public sealed class GrafanaEvidenceConnector(
 
             var annotationParameters = new List<string>
             {
-                $"from={fromMilliseconds}", $"to={toMilliseconds}", $"limit={Math.Min(scope.MaxItems, configuration.Connector.MaxItems)}"
+                $"from={fromMilliseconds}", $"to={toMilliseconds}", $"limit={Math.Min(scope.MaxItems, transport.MaxItems)}"
             };
             annotationParameters.AddRange(configuration.AnnotationTags.Select(tag => $"tags={Uri.EscapeDataString(tag)}"));
-            var annotationsUrl = ConnectorUtilities.Url(configuration.Connector, $"api/annotations?{string.Join('&', annotationParameters)}");
+            var annotationsUrl = ConnectorUtilities.Url(transport, $"api/annotations?{string.Join('&', annotationParameters)}");
             const string annotationOperation = "GET /api/annotations";
             var annotationAllowance = budget.BeginOperation(annotationOperation);
             if (annotationAllowance > 0)
@@ -62,7 +67,7 @@ public sealed class GrafanaEvidenceConnector(
                 try
                 {
                     using var annotationRequest = ConnectorUtilities.CreateRequest(
-                        HttpMethod.Get, annotationsUrl, configuration.Connector);
+                        HttpMethod.Get, annotationsUrl, transport, credentials);
                     annotationRequest.Headers.TryAddWithoutValidation(
                         "X-Grafana-Org-Id", configuration.OrganizationId.ToString());
                     using var response = await client.SendAsync(
@@ -111,13 +116,13 @@ public sealed class GrafanaEvidenceConnector(
                         }
                     }
                 };
-                var queryUrl = ConnectorUtilities.Url(configuration.Connector, "api/ds/query");
+                var queryUrl = ConnectorUtilities.Url(transport, "api/ds/query");
                 var operation = $"POST /api/ds/query ({query.Name})";
                 var allowance = budget.BeginOperation(operation);
                 if (allowance <= 0) continue;
                 try
                 {
-                    using var request = ConnectorUtilities.CreateRequest(HttpMethod.Post, queryUrl, configuration.Connector);
+                    using var request = ConnectorUtilities.CreateRequest(HttpMethod.Post, queryUrl, transport, credentials);
                     request.Headers.TryAddWithoutValidation("X-Grafana-Org-Id", configuration.OrganizationId.ToString());
                     request.Content = JsonContent.Create(queryBody);
                     using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
@@ -146,6 +151,8 @@ public sealed class GrafanaEvidenceConnector(
                         {
                             query.Name,
                             query.DatasourceUid,
+                            maximumObservedValue = max,
+                            query.WarningAbove,
                             exactWindowStart = scope.Start,
                             exactWindowEnd = scope.End
                         }),
@@ -160,7 +167,7 @@ public sealed class GrafanaEvidenceConnector(
 
             var itemLimit = Math.Min(
                 Math.Max(0, scope.MaxItems),
-                Math.Max(0, configuration.Connector.MaxItems));
+                Math.Max(0, transport.MaxItems));
             var rankedFindings = EvidenceRankingPolicy.Rank(findings, context.TriggeredAt);
             var orderedTimeline = timeline.OrderBy(item => item.OccurredAt).ToList();
             var distinctLinks = links.Distinct().ToList();

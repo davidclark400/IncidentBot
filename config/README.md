@@ -16,4 +16,4 @@ Query templates may use only these placeholders:
 
 Substituted values are limited to letters, numbers, `_`, `-`, `.`, `:`, and `/`. Arbitrary alert-provided query fragments are rejected.
 
-Every source accepts `mode: api` or `mode: mcp`. API credentials and MCP bearer tokens are referenced by environment-variable name and must not be committed.
+Profiles only enable and scope evidence sources. API/MCP transport, endpoint, timeout, limit, and credential-variable-name settings belong under `EvidenceSources` in application configuration (`appsettings*` or environment-variable overrides). Secret values belong only in the deployment secret mechanism and must not be committed.

@@ -125,6 +125,12 @@ export type IncidentStatusChanged = {
     version: number;
 };
 
+export type IncidentTriggerResult = {
+    incidentId: string;
+    incidentUrl: string;
+    duplicate: boolean;
+};
+
 export type IncidentUpdated = {
     incidentId: string;
     version: number;
@@ -195,6 +201,14 @@ export type ProblemContext = {
     diagnostic: null | string;
 };
 
+export type ProblemDetails = {
+    type?: null | string;
+    title?: null | string;
+    status?: null | number;
+    detail?: null | string;
+    instance?: null | string;
+};
+
 export type ProblemLifecycleState = 'new' | 'ongoing' | 'resolved' | 'regressed' | 'escalating';
 
 export type ProblemOccurrence = {
@@ -204,6 +218,27 @@ export type ProblemOccurrence = {
     occurredAt: string;
     updatedAt: string;
     reportUrl: null | string;
+};
+
+export type RecentPagerDutyIncident = {
+    id: string;
+    incidentNumber: number;
+    title: string;
+    status: string;
+    urgency: string;
+    createdAt: string;
+    lastStatusChangeAt: string;
+    serviceId: string;
+    serviceName: string;
+    assignees: Array<string>;
+    htmlUrl: null | string;
+};
+
+export type RecentPagerDutyIncidents = {
+    since: string;
+    until: string;
+    hasMore: boolean;
+    incidents: Array<RecentPagerDutyIncident>;
 };
 
 export type SourceHealth = 'pending' | 'complete' | 'partial' | 'unavailable' | 'excluded';
@@ -220,7 +255,10 @@ export type SourceReport = {
     durationMilliseconds: number;
     diagnostic: null | string;
     links: Array<SourceLink>;
+    requestState: SourceRequestState;
 };
+
+export type SourceRequestState = 'requested' | 'received' | 'errored';
 
 export type TimelineEvent = {
     occurredAt: string;
@@ -364,3 +402,51 @@ export type GetIncidentEvidenceResponses = {
 };
 
 export type GetIncidentEvidenceResponse = GetIncidentEvidenceResponses[keyof GetIncidentEvidenceResponses];
+
+export type GetRecentPagerDutyIncidentsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        since?: string;
+        until?: string;
+    };
+    url: '/api/pagerduty/incidents';
+};
+
+export type GetRecentPagerDutyIncidentsErrors = {
+    400: ProblemDetails;
+    502: ProblemDetails;
+    503: ProblemDetails;
+};
+
+export type GetRecentPagerDutyIncidentsError = GetRecentPagerDutyIncidentsErrors[keyof GetRecentPagerDutyIncidentsErrors];
+
+export type GetRecentPagerDutyIncidentsResponses = {
+    200: RecentPagerDutyIncidents;
+};
+
+export type GetRecentPagerDutyIncidentsResponse = GetRecentPagerDutyIncidentsResponses[keyof GetRecentPagerDutyIncidentsResponses];
+
+export type TriggerPagerDutyIncidentData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/pagerduty/incidents/{id}/trigger';
+};
+
+export type TriggerPagerDutyIncidentErrors = {
+    404: ProblemDetails;
+    409: ProblemDetails;
+    502: ProblemDetails;
+    503: ProblemDetails;
+};
+
+export type TriggerPagerDutyIncidentError = TriggerPagerDutyIncidentErrors[keyof TriggerPagerDutyIncidentErrors];
+
+export type TriggerPagerDutyIncidentResponses = {
+    202: IncidentTriggerResult;
+};
+
+export type TriggerPagerDutyIncidentResponse = TriggerPagerDutyIncidentResponses[keyof TriggerPagerDutyIncidentResponses];

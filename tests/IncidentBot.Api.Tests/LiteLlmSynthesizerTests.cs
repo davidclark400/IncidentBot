@@ -196,6 +196,7 @@ public sealed class LiteLlmSynthesizerTests
             InputCharacterBudget = budget,
             MaxOutputTokens = 1_000
         }),
+        TestConfiguration.Credentials(),
         NullLogger<LiteLlmSynthesizer>.Instance);
 
     private static IncidentRecord Incident() => new(

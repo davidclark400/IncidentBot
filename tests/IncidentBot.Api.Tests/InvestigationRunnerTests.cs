@@ -22,16 +22,17 @@ public sealed class InvestigationRunnerTests
         var repository = new RecordingRepository(incident);
         var updates = new RecordingUpdates();
         var connector = new RecordingConnector();
-        var evidenceSources = new EvidenceSourceRegistry([connector]);
+        var evidenceSources = new EvidenceSourceRegistry([connector], TestConfiguration.EvidenceSources());
+        var botOptions = BotOptions();
         var runner = new InvestigationRunner(
             repository,
             new ProfileProvider([connector.Source]),
             evidenceSources,
+            Collector(botOptions),
             new ReportComposer(TimeProvider.System, evidenceSources),
             new Synthesizer(),
             updates,
-            Microsoft.Extensions.Options.Options.Create(
-                new IncidentBotOptions { CollectionEnabled = true, EvidenceWindowMinutes = 30 }),
+            botOptions,
             TimeProvider.System,
             new Recurrence(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<InvestigationRunner>.Instance);
@@ -42,7 +43,9 @@ public sealed class InvestigationRunnerTests
         Assert.True(connector.WasCalled);
         Assert.NotNull(repository.SavedReport);
         Assert.Equal("ready", repository.SavedReport.Status);
-        Assert.Equal(new[] { "status:collecting", "report:ready" }, updates.Events);
+        Assert.Equal(SourceRequestState.Requested, Assert.Single(repository.SavedReports[0].Sources).RequestState);
+        Assert.Equal(SourceRequestState.Received, Assert.Single(repository.SavedReport.Sources).RequestState);
+        Assert.Equal(new[] { "status:collecting", "report:collecting", "report:ready" }, updates.Events);
     }
 
     [Fact]
@@ -61,6 +64,12 @@ public sealed class InvestigationRunnerTests
         Assert.Contains("unexpected collector failure", failed.Diagnostic);
         Assert.Contains(synthesizer.Results, result => result.Source == "nomad" && result.Findings.Count == 1);
         Assert.Equal("ready", repository.SavedReport?.Status);
+        Assert.Equal(
+            SourceRequestState.Errored,
+            repository.SavedReport?.Sources.Single(source => source.Source == "pagerduty").RequestState);
+        Assert.Equal(
+            SourceRequestState.Received,
+            repository.SavedReport?.Sources.Single(source => source.Source == "nomad").RequestState);
     }
 
     [Fact]
@@ -83,13 +92,14 @@ public sealed class InvestigationRunnerTests
         var incident = Incident() with { State = IncidentState.Resolved, IsFrozen = true, Version = 1 };
         var profileProvider = new ProfileProvider([]);
         var profile = profileProvider.Resolve(incident.ServiceId, incident.Labels);
-        var evidenceSources = new EvidenceSourceRegistry([]);
+        var evidenceSources = new EvidenceSourceRegistry([], TestConfiguration.EvidenceSources());
         var previous = new ReportComposer(TimeProvider.System, evidenceSources).ComposeInitial(incident, profile, profileProvider.Revision);
         var repository = new RecordingRepository(incident, previous);
         var updates = new RecordingUpdates();
+        var botOptions = BotOptions(collectionEnabled: false);
         var runner = new InvestigationRunner(
-            repository, profileProvider, evidenceSources, new ReportComposer(TimeProvider.System, evidenceSources), new Synthesizer(), updates,
-            Microsoft.Extensions.Options.Options.Create(new IncidentBotOptions { CollectionEnabled = false }),
+            repository, profileProvider, evidenceSources, Collector(botOptions),
+            new ReportComposer(TimeProvider.System, evidenceSources), new Synthesizer(), updates, botOptions,
             TimeProvider.System, new Recurrence(), NullLogger<InvestigationRunner>.Instance);
 
         await runner.RunAsync(incident.Id, CancellationToken.None);
@@ -98,6 +108,36 @@ public sealed class InvestigationRunnerTests
         Assert.Equal("resolved", repository.SavedReport?.Status);
         Assert.Equal("available", repository.SavedReport?.Problem?.Availability);
         Assert.Equal(new[] { "report:resolved" }, updates.Events);
+    }
+
+    [Fact]
+    public async Task ResolvedIncidentStillCollectsAndKeepsItsLifecycleTimeline()
+    {
+        var incident = Incident() with
+        {
+            State = IncidentState.Resolved,
+            IsFrozen = true,
+            Version = 0,
+            TriggeredAt = DateTimeOffset.Parse("2026-07-11T10:00:00Z"),
+            UpdatedAt = DateTimeOffset.Parse("2026-07-11T10:20:00Z")
+        };
+        var repository = new RecordingRepository(incident);
+        var connector = new RecordingConnector();
+        var runner = Runner(repository, [connector], new Synthesizer());
+
+        await runner.RunAsync(incident.Id, CancellationToken.None);
+
+        Assert.True(connector.WasCalled);
+        Assert.Equal(
+            incident.TriggeredAt - TimeSpan.FromMinutes(30),
+            connector.LastScope?.Start);
+        Assert.Equal(IncidentProgression.Resolved, repository.SavedReport?.Status);
+        Assert.Contains(repository.SavedReport!.Timeline, item =>
+            item.Kind == "incident-triggered" && item.OccurredAt == incident.TriggeredAt);
+        Assert.Contains(repository.SavedReport.Timeline, item =>
+            item.Kind == "incident-state"
+            && item.Summary == "PagerDuty incident resolved"
+            && item.OccurredAt == incident.UpdatedAt);
     }
 
     private static IncidentRecord Incident() => new(
@@ -113,19 +153,33 @@ public sealed class InvestigationRunnerTests
         IRecurrenceCoordinator? recurrence = null)
     {
         var connectorList = connectors.ToList();
-        var evidenceSources = new EvidenceSourceRegistry(connectorList);
+        var evidenceSources = new EvidenceSourceRegistry(connectorList, TestConfiguration.EvidenceSources());
+        var botOptions = BotOptions();
         return new InvestigationRunner(
             repository, new ProfileProvider(connectorList.Select(item => item.Source)), evidenceSources,
-            new ReportComposer(TimeProvider.System, evidenceSources), synthesizer, new RecordingUpdates(),
-            Microsoft.Extensions.Options.Options.Create(
-                new IncidentBotOptions { CollectionEnabled = true, EvidenceWindowMinutes = 30 }),
+            Collector(botOptions), new ReportComposer(TimeProvider.System, evidenceSources),
+            synthesizer, new RecordingUpdates(), botOptions,
             TimeProvider.System, recurrence ?? new Recurrence(), NullLogger<InvestigationRunner>.Instance);
     }
+
+    private static IOptions<IncidentBotOptions> BotOptions(bool collectionEnabled = true) =>
+        Microsoft.Extensions.Options.Options.Create(new IncidentBotOptions
+        {
+            CollectionEnabled = collectionEnabled,
+            EvidenceWindowMinutes = 30,
+            EvidenceMaximumWindowMinutes = 30
+        });
+
+    private static AdaptiveEvidenceCollector Collector(IOptions<IncidentBotOptions> options) => new(
+        options,
+        TimeProvider.System,
+        NullLogger<AdaptiveEvidenceCollector>.Instance);
 
     private sealed class RecordingRepository(IncidentRecord incident, InvestigationReport? previousReport = null) : IIncidentStore
     {
         public List<string> Statuses { get; } = [];
-        public InvestigationReport? SavedReport { get; private set; }
+        public List<InvestigationReport> SavedReports { get; } = [];
+        public InvestigationReport? SavedReport => SavedReports.LastOrDefault();
 
         public Task<IncidentRecord?> GetIncidentAsync(Guid incidentId, CancellationToken cancellationToken) =>
             Task.FromResult<IncidentRecord?>(incident);
@@ -138,7 +192,7 @@ public sealed class InvestigationRunnerTests
             InvestigationReport report,
             CancellationToken cancellationToken)
         {
-            SavedReport = report;
+            SavedReports.Add(report);
             return Task.FromResult(current.Version + 1);
         }
 
@@ -187,6 +241,7 @@ public sealed class InvestigationRunnerTests
     {
         public string Source => source;
         public bool WasCalled { get; private set; }
+        public EvidenceScope? LastScope { get; private set; }
 
         public Task<ConnectorResult> CollectAsync(
             InvestigationContext context,
@@ -194,6 +249,7 @@ public sealed class InvestigationRunnerTests
             CancellationToken cancellationToken)
         {
             WasCalled = true;
+            LastScope = scope;
             var finding = new EvidenceFinding(
                 "finding-1", Source, scope.End, null, "incident", "warning", "Signal found",
                 null, null, 0.9, new JsonObject());

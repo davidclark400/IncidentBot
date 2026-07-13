@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.WebSockets;
 using System.Text.Json;
+using IncidentBot.Api.Infrastructure;
 using IncidentBot.Api.Options;
 using Microsoft.Extensions.Options;
 
@@ -11,6 +12,7 @@ public sealed class SlackSocketModeWorker(
     IOptions<SlackOptions> options,
     InvestigationRestartService restart,
     SlackPublisher slack,
+    ICredentialProvider credentials,
     ILogger<SlackSocketModeWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -21,7 +23,7 @@ public sealed class SlackSocketModeWorker(
             return;
         }
 
-        var appToken = Environment.GetEnvironmentVariable(options.Value.AppTokenEnv);
+        var appToken = credentials.Get(options.Value.AppTokenEnv);
         if (string.IsNullOrWhiteSpace(appToken))
         {
             logger.LogCritical(

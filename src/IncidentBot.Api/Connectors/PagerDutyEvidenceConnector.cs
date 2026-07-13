@@ -1,24 +1,29 @@
 using System.Text.Json;
 using System.Net.Http.Headers;
 using IncidentBot.Api.Domain;
+using IncidentBot.Api.Infrastructure;
 
 namespace IncidentBot.Api.Connectors;
 
 public sealed class PagerDutyEvidenceConnector(
     IHttpClientFactory httpClientFactory,
-    IMcpEvidenceAdapter mcp) : IIncidentEvidenceConnector
+    IMcpEvidenceAdapter mcp,
+    EvidenceSourceConfiguration evidenceSources,
+    ICredentialProvider credentials) : IIncidentEvidenceConnector
 {
     public string Source => EvidenceSourceRegistry.PagerDuty;
+    public bool SupportsWindowExpansion => false;
 
     public Task<ConnectorResult> CollectAsync(InvestigationContext context, EvidenceScope scope, CancellationToken cancellationToken)
     {
         var configuration = context.Profile.PagerDuty;
         if (configuration is null) return Task.FromResult(ConnectorResult.Excluded(Source));
+        var transport = evidenceSources.For(Source);
         return ConnectorUtilities.CollectAsync(
-            Source, configuration.Connector, mcp, context, scope,
+            Source, transport, mcp, context, scope,
             new { incidentId = context.PagerDutyIncidentId }, async ct =>
         {
-            var budget = new ConnectorByteBudget(scope.MaxBytes, configuration.Connector.MaxBytes, 1);
+            var budget = new ConnectorByteBudget(scope.MaxBytes, transport.MaxBytes, 1);
             const string operation = "GET /incidents/{id}";
             var allowance = budget.BeginOperation(operation);
             if (allowance <= 0)
@@ -29,9 +34,10 @@ public sealed class PagerDutyEvidenceConnector(
 
             using var request = ConnectorUtilities.CreateRequest(
                 HttpMethod.Get,
-                ConnectorUtilities.Url(configuration.Connector, $"incidents/{Uri.EscapeDataString(context.PagerDutyIncidentId)}"),
-                configuration.Connector);
-            var token = Environment.GetEnvironmentVariable(configuration.Connector.CredentialEnv);
+                ConnectorUtilities.Url(transport, $"incidents/{Uri.EscapeDataString(context.PagerDutyIncidentId)}"),
+                transport,
+                credentials);
+            var token = credentials.Get(transport.CredentialEnv);
             if (!string.IsNullOrWhiteSpace(token))
             {
                 request.Headers.Authorization = new AuthenticationHeaderValue("Token", $"token={token}");
@@ -58,25 +64,45 @@ public sealed class PagerDutyEvidenceConnector(
             using (json)
             {
                 var incident = json.RootElement.TryGetProperty("incident", out var wrapped) ? wrapped : json.RootElement;
-                var occurred = ConnectorUtilities.Timestamp(incident, "created_at", context.TriggeredAt);
-                var status = ConnectorUtilities.Text(incident, "status");
+                var triggeredAt = ConnectorUtilities.Timestamp(incident, "created_at", context.TriggeredAt);
+                var statusChangedAt = ConnectorUtilities.Timestamp(incident, "last_status_change_at", triggeredAt);
+                var status = ConnectorUtilities.Text(incident, "status").ToLowerInvariant();
+                var incidentSeverity = ConnectorUtilities.Text(incident, "urgency") == "high"
+                    ? "critical"
+                    : "warning";
                 var url = ConnectorUtilities.Text(incident, "html_url", "");
                 var finding = new EvidenceFinding(
-                    ConnectorUtilities.Id(Source, "incident", context.PagerDutyIncidentId), Source, occurred, null,
+                    ConnectorUtilities.Id(Source, "incident", context.PagerDutyIncidentId), Source, statusChangedAt, null,
                     "incident", status == "triggered" ? "critical" : "info",
                     $"PagerDuty incident is {status}", null, string.IsNullOrWhiteSpace(url) ? null : url, 1,
                     ConnectorUtilities.Provenance("GET /incidents/{id}", new { incidentId = context.PagerDutyIncidentId }));
+                var timeline = new List<TimelineCandidate>
+                {
+                    new(triggeredAt, Source, "incident-triggered", "PagerDuty incident triggered",
+                        incidentSeverity, finding.Url)
+                };
+                if (status != "triggered")
+                {
+                    timeline.Add(new TimelineCandidate(
+                        statusChangedAt,
+                        Source,
+                        "incident-state",
+                        $"PagerDuty incident {status}",
+                        "info",
+                        finding.Url));
+                }
                 var itemLimit = Math.Min(
                     Math.Max(0, scope.MaxItems),
-                    Math.Max(0, configuration.Connector.MaxItems));
-                var itemsTruncated = itemLimit < 1;
+                    Math.Max(0, transport.MaxItems));
+                var selectedTimeline = timeline
+                    .Skip(Math.Max(0, timeline.Count - itemLimit))
+                    .ToList();
+                var itemsTruncated = itemLimit < timeline.Count;
                 return new ConnectorResult(
                     Source,
                     itemsTruncated ? SourceHealth.Partial : SourceHealth.Complete,
                     itemLimit > 0 ? [finding] : [],
-                    itemLimit > 0
-                        ? [new TimelineCandidate(occurred, Source, "pagerduty", finding.Summary, finding.Severity, finding.Url)]
-                        : [],
+                    selectedTimeline,
                     itemLimit > 0 && finding.Url is not null
                         ? [new SourceLink("PagerDuty incident", finding.Url)]
                         : [],

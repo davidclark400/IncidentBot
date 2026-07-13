@@ -252,7 +252,7 @@
     },
     {
       "schema": "SourceReport",
-      "contractHash": "sha256:8242dc3af975e774325651760262d8624df32e77f4eb2ccc5862cb9ca89c9962",
+      "contractHash": "sha256:d1352b53a31c504eb55d02a24bc52d0b0d7461dafa8779f5a37dbe012245939d",
       "consumers": [
         {
           "name": "SourceRow",
@@ -261,6 +261,7 @@
             "durationMilliseconds",
             "findingCount",
             "health",
+            "requestState",
             "source"
           ]
         }
@@ -273,6 +274,18 @@
     {
       "schema": "SourceHealth",
       "contractHash": "sha256:839baa2b04ede8f1bdbcf13974618a0ff258d6d75199a7f620237be5e134b0ef",
+      "consumers": [
+        {
+          "name": "SourceRow",
+          "file": "src/report/AnalysisSections.tsx",
+          "fields": []
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "SourceRequestState",
+      "contractHash": "sha256:020ed56c990c9b88b5fe54ad5168b0b96f13f134f89b64505bce0b5c619d44a0",
       "consumers": [
         {
           "name": "SourceRow",
@@ -456,6 +469,85 @@
       }
     },
     {
+      "schema": "RecentPagerDutyIncidents",
+      "contractHash": "sha256:a86b81c2683bca68b944963f63653694a22c3a9832309e624d7db53e97144dab",
+      "consumers": [
+        {
+          "name": "RecentIncidentsPage",
+          "file": "src/features/recent-incidents/RecentIncidentsPage.tsx",
+          "fields": [
+            "hasMore",
+            "incidents",
+            "until"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "since": "The selected time-frame label already communicates the start of the query window."
+      }
+    },
+    {
+      "schema": "RecentPagerDutyIncident",
+      "contractHash": "sha256:eed8c4b965784417c1474b631a4f7703044a9e8d3cb703ba1bce95c1f5430111",
+      "consumers": [
+        {
+          "name": "RecentIncidentList",
+          "file": "src/features/recent-incidents/RecentIncidentList.tsx",
+          "fields": [
+            "assignees",
+            "createdAt",
+            "htmlUrl",
+            "id",
+            "incidentNumber",
+            "lastStatusChangeAt",
+            "serviceName",
+            "status",
+            "title",
+            "urgency"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "serviceId": "The responder-facing service name is displayed instead of the PagerDuty service identifier."
+      }
+    },
+    {
+      "schema": "IncidentTriggerResult",
+      "contractHash": "sha256:dd0e710faf15f34087a8f21a9fd74eea0dc677ea56d453d7cd0764c6051c735d",
+      "consumers": [
+        {
+          "name": "useRecentIncidents",
+          "file": "src/features/recent-incidents/useRecentIncidents.ts",
+          "fields": [
+            "incidentUrl"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "duplicate": "Both newly accepted and duplicate events navigate to the canonical investigation.",
+        "incidentId": "Navigation uses the server-provided incident URL."
+      }
+    },
+    {
+      "schema": "ProblemDetails",
+      "contractHash": "sha256:33df09f27a3c6abbcbfaa9503bd547724bf0446131d8f383e89122eaaba0eca2",
+      "consumers": [
+        {
+          "name": "responseMessage",
+          "file": "src/features/recent-incidents/recentIncidentsApi.ts",
+          "fields": [
+            "detail",
+            "title"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "instance": "The landing page presents a concise actionable integration error.",
+        "status": "Fetch response status is used for success handling but is not displayed.",
+        "type": "The landing page presents the human-readable title and detail."
+      }
+    },
+    {
       "schema": "IncidentUpdated",
       "contractHash": "sha256:aab6173b652290b1540a8cdb5f70c840477a0450271cd69171322d29e6225e7d",
       "consumers": [
@@ -498,6 +590,28 @@
           "name": "useIncidentSession",
           "file": "src/features/incidents/useIncidentSession.ts",
           "behavior": "Handles 200, 202, 304, and 404 responses and sends If-None-Match."
+        }
+      ]
+    },
+    {
+      "operationId": "GetRecentPagerDutyIncidents",
+      "contractHash": "sha256:3e8911313b0e104899fcea430146b1ede8a82faf369a17fb18fd874bad1d67d0",
+      "consumers": [
+        {
+          "name": "getRecentPagerDutyIncidents",
+          "file": "src/features/recent-incidents/recentIncidentsApi.ts",
+          "behavior": "Pulls a bounded PagerDuty time frame without caching and renders loading, empty, error, and populated states."
+        }
+      ]
+    },
+    {
+      "operationId": "TriggerPagerDutyIncident",
+      "contractHash": "sha256:cd6ad4e5396e29f326ff9cbd130e80be4ddf2b473c5518dc51d3ca68c2822ed8",
+      "consumers": [
+        {
+          "name": "triggerPagerDutyIncident",
+          "file": "src/features/recent-incidents/recentIncidentsApi.ts",
+          "behavior": "Starts the selected incident through the canonical intake path and navigates to its investigation URL."
         }
       ]
     },

@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Diagnostics;
 using IncidentBot.Api.Domain;
 using IncidentBot.Api.Incidents.Compression;
+using IncidentBot.Api.Infrastructure;
 using IncidentBot.Api.Options;
 using Microsoft.Extensions.Options;
 
@@ -14,6 +15,7 @@ namespace IncidentBot.Api.Incidents;
 public sealed class LiteLlmSynthesizer(
     IHttpClientFactory httpClientFactory,
     IOptions<LiteLlmOptions> options,
+    ICredentialProvider credentials,
     ILogger<LiteLlmSynthesizer> logger) : IInvestigationSynthesizer
 {
     internal const int MaximumResponseBytes = 1_048_576;
@@ -130,7 +132,7 @@ public sealed class LiteLlmSynthesizer(
                 results.Count, hash);
             var url = $"{options.Value.BaseUrl.TrimEnd('/')}/v1/chat/completions";
             using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = JsonContent.Create(requestBody) };
-            var key = Environment.GetEnvironmentVariable(options.Value.ApiKeyEnv);
+            var key = credentials.Get(options.Value.ApiKeyEnv);
             if (!string.IsNullOrWhiteSpace(key)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
             stage = "http-request";
             using var response = await httpClientFactory.CreateClient().SendAsync(

@@ -38,6 +38,7 @@ public sealed class InvestigationRunner(
     IIncidentStore repository,
     IInvestigationProfileProvider profiles,
     EvidenceSourceRegistry evidenceSources,
+    AdaptiveEvidenceCollector evidenceCollector,
     ReportComposer composer,
     IInvestigationSynthesizer synthesizer,
     IIncidentUpdatePublisher updates,
@@ -72,7 +73,7 @@ public sealed class InvestigationRunner(
             var initial = composer.ComposeInitial(incident, profile, profiles.Revision, provisionalContext);
             var initialVersion = await repository.SaveReportAsync(incident, initial, cancellationToken);
             await updates.PublishReportAsync(
-                incident.Id, initialVersion, initial.Status, ["status", "timeline", "problem"], cancellationToken);
+                incident.Id, initialVersion, initial.Status, ["status", "timeline", "sources", "problem"], cancellationToken);
             incident = await repository.GetIncidentAsync(incidentId, cancellationToken)
                 ?? throw new InvalidOperationException($"Incident '{incidentId}' disappeared after initial report.");
             createdInitialReport = true;
@@ -107,13 +108,23 @@ public sealed class InvestigationRunner(
         var context = new InvestigationContext(
             incident.Id, incident.PagerDutyIncidentId, incident.ServiceId, incident.Title, incident.Urgency,
             incident.State, incident.TriggeredAt, incident.Labels, profile);
-        var scope = new EvidenceScope(
-            incident.TriggeredAt - TimeSpan.FromMinutes(options.Value.EvidenceWindowMinutes),
-            timeProvider.GetUtcNow(), profiles.Revision,
-            options.Value.EvidenceMaximumItems,
-            options.Value.EvidenceMaximumBytes);
         var enabledSources = evidenceSources.EnabledSources(profile);
         var selectedConnectors = evidenceSources.Select(profile);
+        if (!createdInitialReport)
+        {
+            var previousReport = await repository.GetReportAsync(incident.Id, cancellationToken);
+            var requested = composer.ComposeCollectionStarted(
+                incident, profile, profiles.Revision, previousReport, provisionalContext);
+            var requestedVersion = await repository.SaveReportAsync(incident, requested, cancellationToken);
+            await updates.PublishReportAsync(
+                incident.Id,
+                requestedVersion,
+                requested.Status,
+                ["status", "sources", "problem"],
+                cancellationToken);
+            incident = await repository.GetIncidentAsync(incidentId, cancellationToken)
+                ?? throw new InvalidOperationException($"Incident '{incidentId}' disappeared after source requests started.");
+        }
         if (selectedConnectors.Count == 0)
         {
             logger.LogWarning(
@@ -126,21 +137,23 @@ public sealed class InvestigationRunner(
                 "Evidence collection started for {ConnectorCount} connectors: {ConnectorSources}",
                 selectedConnectors.Count, string.Join(',', selectedConnectors.Select(connector => connector.Source)));
         }
-        var collectionStopwatch = Stopwatch.StartNew();
-        var tasks = selectedConnectors
-            .Select(connector => CollectSafelyAsync(connector, context, scope, cancellationToken));
-        var results = await Task.WhenAll(tasks);
-        logger.LogInformation(
-            "Evidence collection completed in {DurationMilliseconds} ms: {CompleteCount} complete, {PartialCount} partial, {UnavailableCount} unavailable, {FindingCount} findings",
-            collectionStopwatch.ElapsedMilliseconds,
-            results.Count(result => result.Health == SourceHealth.Complete),
-            results.Count(result => result.Health == SourceHealth.Partial),
-            results.Count(result => result.Health == SourceHealth.Unavailable),
-            results.Sum(result => result.Findings.Count));
+        var collection = await evidenceCollector.CollectAsync(
+            context,
+            profiles.Revision,
+            selectedConnectors,
+            cancellationToken);
+        var results = collection.ConnectorResults;
         var previous = await repository.GetReportAsync(incident.Id, cancellationToken);
-        logger.LogDebug("Synthesis started with {ConnectorResultCount} connector results", results.Length);
+        logger.LogDebug("Synthesis started with {ConnectorResultCount} connector results", results.Count);
         var ai = await synthesizer.SynthesizeAsync(incident, results, previous?.Ai, cancellationToken);
-        var report = composer.Compose(incident, profile, profiles.Revision, results, previous, ai);
+        var report = composer.Compose(
+            incident,
+            profile,
+            profiles.Revision,
+            results,
+            previous,
+            ai,
+            collectionOutcome: collection.Outcome);
         report = report with
         {
             Problem = await recurrence.ResolveFinalAsync(incident, report.Evidence, cancellationToken)
@@ -150,51 +163,12 @@ public sealed class InvestigationRunner(
             incident.Id, version, report.Status,
             ["summary", "ai", "timeline", "evidence", "sources", "links", "problem"], cancellationToken);
         logger.LogInformation(
-            "Investigation completed in {DurationMilliseconds} ms with report version {ReportVersion}, status {ReportStatus}, and synthesis status {SynthesisStatus}",
-            investigationStopwatch.ElapsedMilliseconds, version, report.Status, ai.Status);
+            "Investigation completed in {DurationMilliseconds} ms with report version {ReportVersion}, status {ReportStatus}, synthesis status {SynthesisStatus}, and evidence completion reason {EvidenceCompletionReason}",
+            investigationStopwatch.ElapsedMilliseconds,
+            version,
+            report.Status,
+            ai.Status,
+            collection.Outcome.CompletionReason);
     }
 
-    private async Task<ConnectorResult> CollectSafelyAsync(
-        IIncidentEvidenceConnector connector,
-        InvestigationContext context,
-        EvidenceScope scope,
-        CancellationToken cancellationToken)
-    {
-        var stopwatch = Stopwatch.StartNew();
-        try
-        {
-            var result = await connector.CollectAsync(context, scope, cancellationToken);
-            if (result.Health == SourceHealth.Unavailable)
-            {
-                logger.LogWarning(
-                    "Connector {Source} unavailable after {DurationMilliseconds} ms: {Diagnostic}",
-                    connector.Source, result.DurationMilliseconds,
-                    string.IsNullOrWhiteSpace(result.Diagnostic) ? "No diagnostic supplied" : result.Diagnostic);
-            }
-            else if (result.Health == SourceHealth.Partial)
-            {
-                logger.LogWarning(
-                    "Connector {Source} returned partial evidence after {DurationMilliseconds} ms with {FindingCount} findings: {Diagnostic}",
-                    connector.Source, result.DurationMilliseconds, result.Findings.Count,
-                    string.IsNullOrWhiteSpace(result.Diagnostic) ? "No diagnostic supplied" : result.Diagnostic);
-            }
-            else
-            {
-                logger.LogDebug(
-                    "Connector {Source} completed with health {SourceHealth} in {DurationMilliseconds} ms and returned {FindingCount} findings",
-                    connector.Source, result.Health, result.DurationMilliseconds, result.Findings.Count);
-            }
-            return result;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(exception, "Connector {Source} failed outside its normal failure boundary", connector.Source);
-            var diagnostic = exception.Message.Length <= 500 ? exception.Message : exception.Message[..500] + "…";
-            return ConnectorResult.Unavailable(connector.Source, stopwatch.ElapsedMilliseconds, diagnostic);
-        }
-    }
 }
