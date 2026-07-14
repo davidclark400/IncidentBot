@@ -294,6 +294,51 @@ public sealed class AdaptiveEvidenceCollector(
             };
         }
 
+        if (findings.All(EvidenceRankingPolicy.IsKafkaFinding))
+        {
+            var directions = findings
+                .Select(finding => ScopeText(finding, "direction")?.ToLowerInvariant())
+                .ToList();
+            var identities = findings
+                .Select(finding => $"{finding.Category}\u001f{finding.ObjectType}\u001f{finding.ObjectId}")
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            var withValues = findings
+                .Select(finding => new
+                {
+                    Finding = finding,
+                    HasValue = TryScopeDouble(finding, "reducedValue", out var value),
+                    Value = value
+                })
+                .Where(item => item.HasValue)
+                .ToList();
+            if (directions.All(direction => direction is "above" or "below")
+                && directions.Distinct(StringComparer.Ordinal).Count() == 1
+                && identities.Count == 1
+                && withValues.Count == findings.Count)
+            {
+                var selected = directions[0] == "below"
+                    ? withValues
+                        .OrderBy(item => item.Value)
+                        .ThenByDescending(item => EvidenceRankingPolicy.Score(item.Finding, incidentTriggeredAt))
+                        .ThenBy(item => item.Finding.Summary, StringComparer.Ordinal)
+                        .First()
+                    : withValues
+                        .OrderByDescending(item => item.Value)
+                        .ThenByDescending(item => EvidenceRankingPolicy.Score(item.Finding, incidentTriggeredAt))
+                        .ThenBy(item => item.Finding.Summary, StringComparer.Ordinal)
+                        .First();
+                return selected.Finding with
+                {
+                    Provenance = MergeWindowProvenance(
+                        selected.Finding,
+                        findings,
+                        "reducedValue",
+                        selected.Value)
+                };
+            }
+        }
+
         if (findings.All(finding => finding.Category == "metric"))
         {
             var withValues = findings
@@ -396,9 +441,14 @@ public sealed class AdaptiveEvidenceCollector(
     {
         value = 0;
         if (ScopeNode(finding, name) is not JsonValue json) return false;
-        if (json.TryGetValue<double>(out value)) return true;
-        if (!json.TryGetValue<long>(out var integer)) return false;
-        value = integer;
+        if (json.TryGetValue<double>(out value)) return double.IsFinite(value);
+        if (json.TryGetValue<long>(out var integer))
+        {
+            value = integer;
+            return true;
+        }
+        if (!json.TryGetValue<int>(out var smallerInteger)) return false;
+        value = smallerInteger;
         return true;
     }
 

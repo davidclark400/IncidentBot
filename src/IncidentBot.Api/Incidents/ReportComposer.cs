@@ -1,5 +1,6 @@
 using IncidentBot.Api.Domain;
 using IncidentBot.Api.Connectors;
+using System.Text.Json.Nodes;
 
 namespace IncidentBot.Api.Incidents;
 
@@ -166,17 +167,36 @@ public sealed class ReportComposer(TimeProvider timeProvider, EvidenceSourceRegi
         return summary;
     }
 
-    private static string CausalLabel(string category) => category switch
+    private static string CausalLabel(string category)
     {
-        "merge-request-created" => "MR created",
-        "merge-request-merged" => "MR merged",
-        "pipeline" => "pipeline failed",
-        "pipeline-job-output" => "failed pipeline step",
-        "deployment" => "production deployment",
-        "workload-failure" => "Nomad failure",
-        "first-error" => "first log error",
-        _ => category
-    };
+        if (category.StartsWith("kafka-", StringComparison.Ordinal))
+        {
+            if (category.Contains("lag", StringComparison.Ordinal)) return "Kafka lag observed";
+            if (category.Contains("rebalance", StringComparison.Ordinal)
+                || category.Contains("election", StringComparison.Ordinal)) return "Kafka state-change activity";
+            if (category.Contains("availability", StringComparison.Ordinal)
+                || category.Contains("offline", StringComparison.Ordinal)
+                || category.Contains("replic", StringComparison.Ordinal)
+                || category.Contains("leader", StringComparison.Ordinal)) return "Kafka availability anomaly";
+            if (category.Contains("producer", StringComparison.Ordinal)) return "Kafka producer anomaly";
+            if (category.Contains("consumer", StringComparison.Ordinal)) return "Kafka consumer anomaly";
+            if (category.Contains("broker", StringComparison.Ordinal)) return "Kafka broker anomaly";
+            if (category.Contains("jvm", StringComparison.Ordinal)) return "Kafka JVM pressure";
+            return "Kafka anomaly observed";
+        }
+
+        return category switch
+        {
+            "merge-request-created" => "MR created",
+            "merge-request-merged" => "MR merged",
+            "pipeline" => "pipeline failed",
+            "pipeline-job-output" => "failed pipeline step",
+            "deployment" => "production deployment",
+            "workload-failure" => "Nomad failure",
+            "first-error" => "first log error",
+            _ => category
+        };
+    }
 
     internal static IReadOnlyList<CausalEvent> BuildCausalEvents(IReadOnlyList<EvidenceFinding> evidence)
     {
@@ -192,20 +212,21 @@ public sealed class ReportComposer(TimeProvider timeProvider, EvidenceSourceRegi
         };
 
         return evidence
-            .Where(finding => categoryOrder.ContainsKey(finding.Category)
-                && (finding.Category is not ("pipeline" or "pipeline-job-output")
-                    || EvidenceRankingPolicy.IsHighSignal(finding)))
+            .Where(finding => IsCausalFinding(finding, categoryOrder))
             .GroupBy(
-                finding => finding.Category is "pipeline" or "pipeline-job-output"
+                finding => EvidenceRankingPolicy.IsKafkaFinding(finding)
+                    ? $"{finding.Category}|{EvidenceRankingPolicy.GroupKey(finding)}"
+                    : finding.Category is "pipeline" or "pipeline-job-output"
                     ? EvidenceRankingPolicy.GroupKey(finding)
                     : finding.Id,
                 StringComparer.Ordinal)
             .Select(group => group
                 .OrderByDescending(finding => finding.Category == "pipeline-job-output")
+                .ThenByDescending(finding => CausalSeverityRank(finding.Severity))
                 .ThenByDescending(finding => finding.Confidence)
                 .First())
             .OrderBy(finding => finding.OccurredAt)
-            .ThenBy(finding => categoryOrder[finding.Category])
+            .ThenBy(finding => categoryOrder.GetValueOrDefault(finding.Category, 5))
             .ThenBy(finding => finding.Id, StringComparer.Ordinal)
             .Select(finding => new CausalEvent(
                 $"causal-{finding.Id}", finding.Category, CausalLabel(finding.Category),
@@ -213,6 +234,40 @@ public sealed class ReportComposer(TimeProvider timeProvider, EvidenceSourceRegi
                 finding.Id, finding.Actor, finding.Url, finding.ObjectType, finding.ObjectId, finding.CodeReferences ?? []))
             .Take(50)
             .ToList();
+    }
+
+    private static int CausalSeverityRank(string severity) => severity switch
+    {
+        "critical" => 3,
+        "warning" => 2,
+        "info" => 1,
+        _ => 0
+    };
+
+    private static bool IsCausalFinding(
+        EvidenceFinding finding,
+        IReadOnlyDictionary<string, int> categoryOrder)
+    {
+        if (categoryOrder.ContainsKey(finding.Category))
+        {
+            return finding.Category is not ("pipeline" or "pipeline-job-output")
+                || EvidenceRankingPolicy.IsHighSignal(finding);
+        }
+
+        return EvidenceRankingPolicy.IsKafkaAnomaly(finding)
+            && ScopeBoolean(finding, "timestampSupported");
+    }
+
+    private static bool ScopeBoolean(EvidenceFinding finding, string name)
+    {
+        if (finding.Provenance["scope"] is not JsonObject scope) return false;
+        var property = scope.FirstOrDefault(item =>
+            string.Equals(item.Key, name, StringComparison.OrdinalIgnoreCase));
+        return property.Value is JsonValue value
+            && (value.TryGetValue<bool>(out var boolean) && boolean
+                || value.TryGetValue<string>(out var text)
+                && bool.TryParse(text, out var parsed)
+                && parsed);
     }
 
     internal static IReadOnlyList<TimelineCandidate> RetainTimeline(

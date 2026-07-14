@@ -138,6 +138,7 @@ public sealed class DataSourceConnectivityChecker(
         EvidenceSourceRegistry.Nomad => "v1/agent/self",
         EvidenceSourceRegistry.GitLab => "api/v4/user",
         EvidenceSourceRegistry.Grafana => "api/health",
+        EvidenceSourceRegistry.Kafka => "api/health",
         EvidenceSourceRegistry.VictoriaLogs => "health",
         _ => ""
     };

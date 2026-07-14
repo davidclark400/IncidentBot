@@ -7,6 +7,7 @@ using IncidentBot.Api.Domain;
 using IncidentBot.Api.Incidents;
 using IncidentBot.Api.Options;
 using IncidentBot.Api.Security;
+using IncidentBot.Kafka;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IncidentBot.Api.Tests;
@@ -225,6 +226,34 @@ public sealed class SlackQueryPlanningTests
     }
 
     [Fact]
+    public void KafkaSelectionKeepsReviewedScopeButLeaksNoPackOrPromQlIntoPlanCatalog()
+    {
+        var reviewed = Profile().WithKafka(new KafkaProfileScope
+        {
+            MetricPackId = "reviewed-exporter-v1",
+            Cluster = "prod-cluster",
+            Topics = ["payments"],
+            ConsumerGroups = ["payments-workers"]
+        });
+        var compiled = new SlackQueryPlanCompiler(new SafeTemplateRenderer()).Compile(
+            ValidPlan(source: "kafka", queryNames: []),
+            reviewed);
+        var kafkaCatalog = Assert.Single(
+            LiteLlmSlackQueryPlanner.BuildSafeCatalog(reviewed),
+            item => item.Source == "kafka");
+
+        Assert.NotNull(compiled.Profile.Kafka);
+        Assert.Equal(["payments"], compiled.Profile.Kafka.Topics);
+        Assert.Null(compiled.Profile.Grafana);
+        Assert.Null(compiled.Profile.VictoriaLogs);
+        Assert.Empty(kafkaCatalog.QueryNames);
+        Assert.Contains("source: kafka", compiled.AuditYaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("reviewed-exporter-v1", compiled.AuditYaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("prod-cluster", compiled.AuditYaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("payments-workers", compiled.AuditYaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task PlannerUsesDedicatedModelAndSendsOnlySafeCatalogNames()
     {
         var planJson = JsonSerializer.Serialize(ValidPlan());
@@ -331,6 +360,27 @@ public sealed class SlackQueryPlanningTests
     {
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
     }
+}
+
+file static class SlackKafkaProfileExtensions
+{
+    public static InvestigationProfile WithKafka(
+        this InvestigationProfile profile,
+        KafkaProfileScope kafka) => new()
+        {
+            Id = profile.Id,
+            PagerDutyServiceId = profile.PagerDutyServiceId,
+            Team = profile.Team,
+            SlackChannel = profile.SlackChannel,
+            SlackPromptLabels = profile.SlackPromptLabels,
+            Selectors = profile.Selectors,
+            PagerDuty = profile.PagerDuty,
+            Nomad = profile.Nomad,
+            GitLab = profile.GitLab,
+            Grafana = profile.Grafana,
+            Kafka = kafka,
+            VictoriaLogs = profile.VictoriaLogs
+        };
 }
 
 public sealed class SlackPromptWorkflowTests

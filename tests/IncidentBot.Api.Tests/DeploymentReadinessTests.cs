@@ -272,6 +272,7 @@ public sealed class DeploymentReadinessTests
             Nomad = options.Nomad,
             GitLab = options.GitLab,
             Grafana = options.Grafana,
+            Kafka = options.Kafka,
             VictoriaLogs = options.VictoriaLogs
         };
     }
@@ -282,6 +283,7 @@ public sealed class DeploymentReadinessTests
         Nomad = Transport("https://nomad.internal.example", "NOMAD_TOKEN"),
         GitLab = Transport("https://gitlab.internal.example", "GITLAB_READ_TOKEN"),
         Grafana = Transport("https://grafana.internal.example", "GRAFANA_SERVICE_TOKEN"),
+        Kafka = Transport("https://grafana.internal.example", "GRAFANA_KAFKA_READ_TOKEN"),
         VictoriaLogs = Transport("https://victorialogs.internal.example", "VICTORIALOGS_TOKEN")
     };
 

@@ -126,10 +126,16 @@ internal static class EvidenceClarityPolicy
     }
 
     private static bool IsFailureSignal(EvidenceFinding finding) =>
-        FailureCategories.Contains(finding.Category);
+        FailureCategories.Contains(finding.Category)
+        || EvidenceRankingPolicy.IsKafkaAnomaly(finding);
 
     private static bool IsExplicitFailure(EvidenceFinding finding)
     {
+        if (EvidenceRankingPolicy.IsKafkaAnomaly(finding)
+            && ScopeValue(finding, "thresholdState") == "critical")
+        {
+            return true;
+        }
         if (finding.Category is "error" or "exception" && finding.Severity == "critical")
         {
             return true;

@@ -48,7 +48,7 @@ For each leased work item, `InvestigationRunner`:
 4. Sets the persisted investigation status to `collecting`.
 5. Builds an `InvestigationContext` and asks the adaptive evidence collector for a bounded result set.
 6. Starts with the configured evidence window, runs the profile-enabled connectors concurrently, and doubles the lookback while accumulated evidence remains deterministically inconclusive.
-7. Fixes the initial collection end time, then queries only disjoint older rings as the window expands: 0–30 minutes, 30–60, 60–120, and 120–240 with the checked-in defaults. PagerDuty and Nomad are exact/current snapshots, so they run only in the first pass; GitLab, Grafana, and VictoriaLogs query each older ring.
+7. Fixes the initial collection end time, then queries only disjoint older rings as the window expands: 0–30 minutes, 30–60, 60–120, and 120–240 with the checked-in defaults. PagerDuty and Nomad are exact/current snapshots, so they run only in the first pass; GitLab, Grafana, Kafka, and VictoriaLogs query each older ring.
 8. Converts a connector exception into an `unavailable` result without cancelling the other sources. If a wider call fails, useful evidence retained from a narrower call remains available and the source is marked partial.
 9. Sends the bounded merged results to synthesis, composes the deterministic report, resolves the final recurrence context, persists a new version, and publishes the version through SignalR.
 
@@ -66,11 +66,12 @@ Editable source: [`incidentbot-source-searches.excalidraw`](diagrams/incidentbot
 | Nomad | For each allowlisted namespace/job pair, reads the primary job state first, then allocations with `all=true`, deployments, and evaluations. Region and namespace are explicit. Allocations in `running` or `complete` state are omitted; unhealthy job/deployment/evaluation states become workload-failure findings. | Job state, unhealthy allocations, deployments/evaluations, workload timeline events, and job links. |
 | GitLab | For each allowlisted project: merged MRs updated after the window start and filtered by merged time; branch commits since/until; diffs for up to five commits filtered to `relevantPaths`; parent and child pipelines updated in the window; configured-environment deployments; failed/cancelled pipeline jobs and bounded trace tails. | MR create/merge events, commits, allowlisted diffs and code references, pipelines, failed-step output, deployments, actors, links, and a candidate change/failure timeline. |
 | Grafana | Builds dashboard/panel links for the window; fetches annotations by configured tags/from/to; renders safe label templates into configured datasource queries and posts them to `/api/ds/query` with 15-second intervals and at most 240 points. | Annotation events and metric snapshots. Numeric maxima over `warningAbove` become warning findings. |
+| Kafka | Loads the profile-selected version 1 metric pack, safely renders only `{{clusterRegex}}`, `{{topicRegex}}`, and `{{consumerGroupRegex}}`, sorts metric targets into batches of at most eight, and posts each batch to Grafana `/api/ds/query`. Configured allowlist values are regex-escaped, queries never fan out by topic, group, broker, or partition, and returned series labels are rejected when they escape the profile scope. | Bounded context and threshold findings for traffic, consumers, producers, replication/leadership, brokers, and JVM pressure; anomaly timeline candidates only when the configured reducer supports a sound timestamp; and a profile-scoped responder dashboard link. |
 | VictoriaLogs | Renders configured LogSQL templates and stream filters. It counts every query first with `/select/logsql/hits`; only positive counts fetch samples from `/select/logsql/query`, selecting configured fields, sorting by `_time` ascending, and limiting to at most 20. | Query counts, redacted log samples, and an independently citable first-error timeline anchor. |
 
 ### Native API and MCP use the same connector contract
 
-Each application-configured evidence source selects either `api` or `mcp` transport. A profile only enables that source and supplies its resource allowlist. Both transports return a `ConnectorResult` with:
+Most application-configured evidence sources select either `api` or `mcp` transport. A profile only enables that source and supplies its resource allowlist. Both transports return a `ConnectorResult` with:
 
 - source health and a bounded diagnostic;
 - bounded, source-attributed findings;
@@ -81,6 +82,8 @@ Each application-configured evidence source selects either `api` or `mcp` transp
 The report tracks the connector-call lifecycle separately: `requested` while awaiting the result, `received` when the connector returns a complete, partial, or excluded result, and `errored` when it returns unavailable. The web source-coverage panel renders this state as soon as the request-start report is published.
 
 The native path uses cumulative byte accounting, item limits, bounded reads, per-source timeouts, stable IDs, and structured provenance. Exhausting a budget results in `partial` health where useful retained evidence exists.
+
+Kafka version 1 is deliberately API-only. `EvidenceSources:Kafka` supplies a Grafana base URL and a read-only Grafana credential, and the connector uses only Grafana `/api/ds/query`; it never connects to Kafka brokers or writes to Grafana, Prometheus, or Kafka. Configuring Kafka with `mcp` transport returns the source as unavailable before collection rather than falling back to another path.
 
 The MCP boundary additionally treats the tool result as untrusted. It verifies that the returned source matches the requested source, rejects findings outside the requested time/resource scope, enforces source-specific allowlists, applies deny-by-default URL rules, removes credential material, canonicalizes IDs, deduplicates findings/timeline/links, and fits the normalized result to 90% of the retained byte budget.
 
@@ -202,7 +205,7 @@ The outbox worker leases `slack.report` items for one minute. A failure releases
 
 Slack Socket Mode acknowledges interactive envelopes immediately. A valid restart action retires unfinished work for the incident, sets status back to `queued`, inserts a new immediate work item and a delayed Slack check, cancels an in-flight run when present, and refreshes the message.
 
-An optional, separate `app_mention` path handles ad-hoc questions without pretending they are PagerDuty incidents. The Socket Mode adapter authenticates the bot identity, accepts only the configured workspace/channel, acknowledges before dispatch, deduplicates and rate-limits events, and uses a bounded queue. A first LiteLLM call selects only reviewed query names and exact profile-owned `slackPromptLabels`; the compiler narrows the profile and emits canonical YAML. Native connectors collect within the normal bounds, then the existing source-neutral synthesis interface performs the second LiteLLM call. One plain-text `chat.postMessage` reply is posted to `thread_ts = event.thread_ts ?? event.ts`. PagerDuty and MCP transports are excluded from this path, and its in-memory queue intentionally does not claim durable delivery.
+An optional, separate `app_mention` path handles ad-hoc questions without pretending they are PagerDuty incidents. The Socket Mode adapter authenticates the bot identity, accepts only the configured workspace/channel, acknowledges before dispatch, deduplicates and rate-limits events, and uses a bounded queue. A first LiteLLM call selects only reviewed sources, exact profile-owned `slackPromptLabels`, and, for Grafana or VictoriaLogs, exact reviewed query names; the compiler narrows the profile and emits canonical YAML. Kafka is selected only as a whole deployment-reviewed pack: the planner sees the source name but no pack ID, PromQL, datasource UID, thresholds, or resource values, and the compiler retains the profile's exact Kafka scope and threshold overrides. Native connectors collect within the normal bounds, then the existing source-neutral synthesis interface performs the second LiteLLM call. One plain-text `chat.postMessage` reply is posted to `thread_ts = event.thread_ts ?? event.ts`. PagerDuty and MCP transports are excluded from this path, and its in-memory queue intentionally does not claim durable delivery.
 
 ## 8. Failure semantics
 
@@ -227,6 +230,7 @@ An optional, separate `app_mention` path handles ad-hoc questions without preten
 | Durable leasing and retry | `IncidentBot.Api/Infrastructure/DurableQueueRepository.cs`, `IncidentBot.Api/Incidents/DurableWorker.cs` |
 | Investigation orchestration | `IncidentBot.Api/Incidents/InvestigationRunner.cs`, `IncidentBot.Api/Incidents/InvestigationWorker.cs` |
 | Source selection and connectors | `IncidentBot.Api/Connectors/EvidenceSourceRegistry.cs`, `IncidentBot.Api/Connectors/*EvidenceConnector.cs` |
+| Kafka metric packs and offline onboarding | `IncidentBot.Kafka/*`, `IncidentBot.Api/Profiles/KafkaMetricPackStore.cs`, `tools/IncidentBot.KafkaOnboarding/Program.cs` |
 | MCP normalization boundary | `IncidentBot.Api/Connectors/McpConnectorResultBoundary.cs` |
 | Evidence priority | `IncidentBot.Api/Incidents/EvidenceRankingPolicy.cs` |
 | AI digest and response validation | `IncidentBot.Api/Incidents/LiteLlmSynthesizer.cs`, `IncidentBot.Api/Incidents/Compression/SemanticEvidenceCompressor.cs` |

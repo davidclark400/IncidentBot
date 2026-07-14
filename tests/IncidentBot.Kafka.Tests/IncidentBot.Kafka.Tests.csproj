@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/IncidentBot.Kafka/IncidentBot.Kafka.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../config/kafka-metric-packs.yaml" Link="config/kafka-metric-packs.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../skills/onboard-kafka-app/SKILL.md" Link="skill/SKILL.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../skills/onboard-kafka-app/agents/openai.yaml" Link="skill/agents/openai.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../skills/onboard-kafka-app/references/onboarding-contract.md" Link="skill/references/onboarding-contract.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -6,6 +6,7 @@ using IncidentBot.Api.Domain;
 using IncidentBot.Api.Infrastructure;
 using IncidentBot.Api.Options;
 using IncidentBot.Api.Security;
+using IncidentBot.Kafka;
 using Microsoft.Extensions.Options;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -59,7 +60,7 @@ public sealed class SlackQueryPlanCompiler(SafeTemplateRenderer templates)
     private const int MaximumQuestionCharacters = 800;
     private static readonly HashSet<string> AllowedSources = new(StringComparer.Ordinal)
     {
-        "nomad", "gitlab", "grafana", "victorialogs"
+        "nomad", "gitlab", "grafana", "kafka", "victorialogs"
     };
     private static readonly HashSet<string> AllowedLabelNames = new(StringComparer.Ordinal)
     {
@@ -273,6 +274,7 @@ public sealed class SlackQueryPlanCompiler(SafeTemplateRenderer templates)
             Grafana = bySource.TryGetValue("grafana", out var grafana)
                 ? Clone(profile.Grafana!, grafana.QueryNames)
                 : null,
+            Kafka = bySource.ContainsKey("kafka") ? Clone(profile.Kafka!) : null,
             VictoriaLogs = bySource.TryGetValue("victorialogs", out var victoriaLogs)
                 ? Clone(profile.VictoriaLogs!, victoriaLogs.QueryNames)
                 : null
@@ -285,6 +287,7 @@ public sealed class SlackQueryPlanCompiler(SafeTemplateRenderer templates)
         if (profile.Nomad is not null) enabled.Add("nomad");
         if (profile.GitLab is not null) enabled.Add("gitlab");
         if (profile.Grafana is not null) enabled.Add("grafana");
+        if (profile.Kafka is not null) enabled.Add("kafka");
         if (profile.VictoriaLogs is not null) enabled.Add("victorialogs");
         return enabled;
     }
@@ -373,22 +376,38 @@ public sealed class SlackQueryPlanCompiler(SafeTemplateRenderer templates)
     private static VictoriaLogsScope Clone(
         VictoriaLogsScope scope,
         IReadOnlyList<string> selectedTemplates) => new()
-    {
-        AccountId = scope.AccountId,
-        ProjectId = scope.ProjectId,
-        StreamFilters = scope.StreamFilters.ToDictionary(
+        {
+            AccountId = scope.AccountId,
+            ProjectId = scope.ProjectId,
+            StreamFilters = scope.StreamFilters.ToDictionary(
             pair => pair.Key,
             pair => pair.Value,
             StringComparer.Ordinal),
-        Fields = [.. scope.Fields],
-        Queries = scope.Queries
+            Fields = [.. scope.Fields],
+            Queries = scope.Queries
             .Where(query => selectedTemplates.Contains(query.Name, StringComparer.Ordinal))
             .Select(query => new VictoriaLogsQuery
             {
                 Name = query.Name,
                 Expression = query.Expression
             }).ToList(),
-        RedactPatterns = [.. scope.RedactPatterns]
+            RedactPatterns = [.. scope.RedactPatterns]
+        };
+
+    private static KafkaProfileScope Clone(KafkaProfileScope scope) => new()
+    {
+        MetricPackId = scope.MetricPackId,
+        Cluster = scope.Cluster,
+        Topics = [.. scope.Topics],
+        ConsumerGroups = [.. scope.ConsumerGroups],
+        ThresholdOverrides = scope.ThresholdOverrides.ToDictionary(
+            pair => pair.Key,
+            pair => new KafkaMetricThresholdOverride
+            {
+                Warning = pair.Value.Warning,
+                Critical = pair.Value.Critical
+            },
+            StringComparer.Ordinal)
     };
 
     private sealed record SlackQueryAuditDocument(
@@ -617,7 +636,7 @@ public sealed class LiteLlmSlackQueryPlanner(
 
     internal static IReadOnlyList<SlackQueryCatalogSource> BuildSafeCatalog(InvestigationProfile profile)
     {
-        var catalog = new List<SlackQueryCatalogSource>(4);
+        var catalog = new List<SlackQueryCatalogSource>(5);
         if (profile.Nomad is not null)
         {
             catalog.Add(new SlackQueryCatalogSource("nomad", []));
@@ -633,6 +652,12 @@ public sealed class LiteLlmSlackQueryPlanner(
                 profile.Grafana.Queries.Select(query => query.Name)
                     .OrderBy(value => value, StringComparer.Ordinal)
                     .ToArray()));
+        }
+        if (profile.Kafka is not null)
+        {
+            // Kafka selects the whole deployment-reviewed pack. The planner never sees
+            // its PromQL, datasource UID, thresholds, or resource values.
+            catalog.Add(new SlackQueryCatalogSource("kafka", []));
         }
         if (profile.VictoriaLogs?.Queries.Count > 0)
         {

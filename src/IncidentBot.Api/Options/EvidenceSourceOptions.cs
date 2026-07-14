@@ -10,6 +10,7 @@ public sealed class EvidenceSourceOptions
     public ConnectorTransport Nomad { get; init; } = new();
     public ConnectorTransport GitLab { get; init; } = new();
     public ConnectorTransport Grafana { get; init; } = new();
+    public ConnectorTransport Kafka { get; init; } = new();
     public ConnectorTransport VictoriaLogs { get; init; } = new();
 
     public IEnumerable<(string Source, ConnectorTransport Transport)> All()
@@ -18,6 +19,7 @@ public sealed class EvidenceSourceOptions
         yield return ("nomad", Nomad);
         yield return ("gitlab", GitLab);
         yield return ("grafana", Grafana);
+        yield return ("kafka", Kafka);
         yield return ("victorialogs", VictoriaLogs);
     }
 }
@@ -53,6 +55,11 @@ public sealed class EvidenceSourceOptionsValidator : IValidateOptions<EvidenceSo
         foreach (var (source, transport) in options.All())
         {
             ValidateTransport(source, transport, failures);
+        }
+
+        if (options.Kafka.Mode != "api")
+        {
+            failures.Add("EvidenceSources:Kafka:Mode must be 'api'; Kafka MCP transport is not supported.");
         }
 
         if (!IsHttpUrl(options.PagerDuty.BaseUrl))

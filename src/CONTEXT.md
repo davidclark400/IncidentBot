@@ -35,7 +35,7 @@ Profile revision is included in evidence scope and reports so responders can ide
 
 ### Evidence source
 
-An operational system from which incident evidence may be collected. Current sources are PagerDuty, Nomad, GitLab, Grafana, and VictoriaLogs.
+An operational system from which incident evidence may be collected. Current sources are PagerDuty, Nomad, GitLab, Grafana, Kafka, and VictoriaLogs.
 
 Each source returns a connector result containing:
 
@@ -55,6 +55,8 @@ An **adaptive evidence window** begins at the configured lookback and expands ex
 ### Connector
 
 An adapter that collects evidence from one evidence source. A connector may use a native HTTP transport or an MCP transport, subject to the same configured scope, item limits, cumulative source byte limit, timeout policy, and source identity. Exhausting a reserved byte or item budget produces partial source health rather than unbounded collection.
+
+Kafka v1 is an explicit exception to transport variability: it is API-only and reads reviewed metric packs through Grafana `/api/ds/query`. It never connects to brokers. Kafka queries are sorted and batched with at most eight targets, use only escaped profile allowlists, and reject returned resource labels outside that scope. Metric packs are shared by runtime collection and deterministic dashboard generation.
 
 GitLab pipeline collection treats a pipeline as a parent evidence group. Current failed jobs are queried before canceled fanout, hard failed non-allowed job families outrank allowed failures and aggregated downstream cancellations, retries are collapsed without reviving recovered jobs, and trace budgets are shared fairly across selected job families. The earliest hard failure carries a structured ordinal so an upstream failure remains ahead of a closer cascading sibling.
 
@@ -151,6 +153,8 @@ A self-contained adapter used to demonstrate the live report experience without 
 - `IncidentBot.Api/Fingerprinting` — the recurrence interface, deterministic feature extraction, normalization, generation, matching, graceful degradation, and problem persistence.
 - `IncidentBot.Api/Infrastructure` — PostgreSQL schema initialization, incident/report persistence, durable queues, and deployment readiness.
 - `IncidentBot.Api/Profiles` — investigation profile models, loading, selection, and validation.
+- `IncidentBot.Kafka` — the shared Kafka metric-pack, safe rendering, discovery, dashboard generation, and offline coverage-validation module.
+- `tools/IncidentBot.KafkaOnboarding` — the small offline CLI adapter over the shared Kafka onboarding interface.
 - `IncidentBot.Api/Domain` — shared domain records used by investigation, persistence, and wire output.
 - `IncidentBot.Api/Demo` — self-contained demo adapters and staged report data.
 - `IncidentBot.Client` — live investigation report client and SignalR session handling.
@@ -158,7 +162,7 @@ A self-contained adapter used to demonstrate the live report experience without 
 ## Established architecture seams
 
 - `IncidentProgression` owns investigation status names and responder-visible progression decisions while persisted reports retain backwards-compatible string values.
-- `EvidenceSourceRegistry` owns the five-source roster, application transport lookup, connector registration, and profile-enabled source selection. Source-specific collection remains with its adapters; profile models own only resource scope.
+- `EvidenceSourceRegistry` owns the six-source roster, application transport lookup, connector registration, and profile-enabled source selection. Source-specific collection remains with its adapters; profile models own only resource scope.
 - `EvidenceRankingPolicy` owns responder-facing evidence relevance, grouping, source diversity, and deterministic ordering. Report, AI, Slack, and connector truncation must use this shared policy rather than treating severity as presentation priority.
 - `IRecurrenceCoordinator` is the investigation workflow's recurrence interface. It owns provisional/final orchestration and unavailable-state mapping; the runner does not coordinate fingerprint construction and matching directly.
 - `RecurrencePolicy` owns candidate ranking, association thresholds, problem keys, time cutoffs, and lifecycle classification. PostgreSQL persistence owns locking and storage.

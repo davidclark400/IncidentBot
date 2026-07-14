@@ -64,6 +64,7 @@ public sealed class EvidenceSourceOptionsTests
             Nomad = options.Nomad,
             GitLab = options.GitLab,
             Grafana = options.Grafana,
+            Kafka = options.Kafka,
             VictoriaLogs = options.VictoriaLogs
         });
 
@@ -80,15 +81,44 @@ public sealed class EvidenceSourceOptionsTests
         Nomad = nomad ?? Transport(),
         GitLab = Transport("https://gitlab.test", "GITLAB_READ_TOKEN"),
         Grafana = Transport("https://grafana.test", "GRAFANA_SERVICE_TOKEN"),
+        Kafka = Transport("https://kafka-grafana.test", "GRAFANA_KAFKA_READ_TOKEN"),
         VictoriaLogs = Transport("https://victorialogs.test", "VICTORIALOGS_TOKEN")
     };
+
+    [Fact]
+    public void KafkaRejectsMcpTransport()
+    {
+        var options = ValidOptions();
+        var result = Validate(new EvidenceSourceOptions
+        {
+            PagerDuty = options.PagerDuty,
+            Nomad = options.Nomad,
+            GitLab = options.GitLab,
+            Grafana = options.Grafana,
+            Kafka = new ConnectorTransport
+            {
+                Mode = "mcp",
+                BaseUrl = "https://grafana.test",
+                Mcp = new McpToolConfiguration
+                {
+                    ServerUrl = "https://mcp.test",
+                    ToolName = "collect_kafka",
+                    CredentialEnv = "KAFKA_MCP_TOKEN"
+                }
+            },
+            VictoriaLogs = options.VictoriaLogs
+        });
+
+        Assert.True(result.Failed);
+        Assert.Contains("Kafka MCP transport is not supported", result.FailureMessage);
+    }
 
     private static ConnectorTransport Transport(
         string baseUrl = "https://nomad.test",
         string credentialEnv = "NOMAD_TOKEN") => new()
-    {
-        Mode = "api",
-        BaseUrl = baseUrl,
-        CredentialEnv = credentialEnv
-    };
+        {
+            Mode = "api",
+            BaseUrl = baseUrl,
+            CredentialEnv = credentialEnv
+        };
 }

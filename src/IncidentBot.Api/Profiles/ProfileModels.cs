@@ -1,3 +1,5 @@
+using IncidentBot.Kafka;
+
 namespace IncidentBot.Api.Domain;
 
 public sealed class ProfileDocument
@@ -20,6 +22,7 @@ public sealed class InvestigationProfile
     public NomadScope? Nomad { get; init; }
     public GitLabScope? GitLab { get; init; }
     public GrafanaScope? Grafana { get; init; }
+    public KafkaProfileScope? Kafka { get; init; }
     public VictoriaLogsScope? VictoriaLogs { get; init; }
 }
 

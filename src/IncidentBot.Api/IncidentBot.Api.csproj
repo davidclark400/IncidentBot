@@ -22,10 +22,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\IncidentBot.Contracts\IncidentBot.Contracts.csproj" />
+    <ProjectReference Include="..\IncidentBot.Kafka\IncidentBot.Kafka.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Content Include="..\..\config\investigation-profiles.yaml" Link="config\investigation-profiles.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\config\kafka-metric-packs.yaml" Link="config\kafka-metric-packs.yaml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <Target Name="BuildClient" BeforeTargets="ComputeFilesToPublish" Condition="'$(BuildClient)' != 'false'">

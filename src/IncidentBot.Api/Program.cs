@@ -125,6 +125,7 @@ else
         ?? throw new InvalidOperationException("ConnectionStrings:IncidentBot is required.");
     builder.Services.AddSingleton(NpgsqlDataSource.Create(connectionString));
     builder.Services.AddSingleton<InvestigationProfileStore>();
+    builder.Services.AddSingleton<KafkaMetricPackStore>();
     builder.Services.AddSingleton<DeploymentReadinessChecker>();
     builder.Services.AddSingleton<PagerDutySignatureValidator>();
     builder.Services.AddSingleton<PagerDutyIncidentClient>();

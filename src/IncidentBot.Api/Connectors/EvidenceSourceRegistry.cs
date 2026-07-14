@@ -9,6 +9,7 @@ public sealed class EvidenceSourceRegistry
     public const string Nomad = "nomad";
     public const string GitLab = "gitlab";
     public const string Grafana = "grafana";
+    public const string Kafka = "kafka";
     public const string VictoriaLogs = "victorialogs";
 
     private static readonly EvidenceSourceDefinition[] Definitions =
@@ -17,6 +18,7 @@ public sealed class EvidenceSourceRegistry
         new(Nomad, profile => profile.Nomad is not null),
         new(GitLab, profile => profile.GitLab is not null),
         new(Grafana, profile => profile.Grafana is not null),
+        new(Kafka, profile => profile.Kafka is not null),
         new(VictoriaLogs, profile => profile.VictoriaLogs is not null)
     ];
 
@@ -75,6 +77,7 @@ public static class EvidenceSourceRegistration
         services.AddSingleton<IIncidentEvidenceConnector, NomadEvidenceConnector>();
         services.AddSingleton<IIncidentEvidenceConnector, GitLabEvidenceConnector>();
         services.AddSingleton<IIncidentEvidenceConnector, GrafanaEvidenceConnector>();
+        services.AddSingleton<IIncidentEvidenceConnector, KafkaEvidenceConnector>();
         services.AddSingleton<IIncidentEvidenceConnector, VictoriaLogsEvidenceConnector>();
         services.AddSingleton<EvidenceSourceRegistry>();
         return services;

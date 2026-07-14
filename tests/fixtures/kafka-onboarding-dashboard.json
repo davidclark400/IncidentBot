@@ -1,0 +1,2180 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Bot-only Kafka evidence dashboard for IncidentBot profile kafka-synthetic-fixture; generated from metric pack synthetic-fixture-kafka-v1.",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Overview",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "title": "Topic byte rate",
+      "description": "IncidentBot metric topic-byte-rate; context evidence; reducer average; unit bytes/s.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000000000
+              },
+              {
+                "color": "red",
+                "value": 2000000000
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(incidentbot_fixture_kafka_topic_bytes_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022}[5m]))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Topic message rate",
+      "description": "IncidentBot metric topic-message-rate; context evidence; reducer average; unit messages/s.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000000
+              },
+              {
+                "color": "red",
+                "value": 2000000
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(incidentbot_fixture_kafka_topic_messages_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022}[5m]))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Availability",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      }
+    },
+    {
+      "id": 5,
+      "title": "Available brokers",
+      "description": "IncidentBot metric broker-availability; anomaly evidence; reducer minimum; unit brokers.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1.0000000000000002
+              },
+              {
+                "color": "green",
+                "value": 2.0000000000000004
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(incidentbot_fixture_kafka_broker_up{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "ISR shrink rate",
+      "description": "IncidentBot metric isr-shrink-rate; anomaly evidence; reducer maximum; unit operations/s.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(incidentbot_fixture_kafka_isr_shrinks_total{cluster=~\u0022${clusterRegex:regex}\u0022}[5m]))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Active partition leaders",
+      "description": "IncidentBot metric leader-count; anomaly evidence; reducer minimum; unit leaders.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 5E-324
+              },
+              {
+                "color": "green",
+                "value": 1.0000000000000002
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(incidentbot_fixture_kafka_partition_leaders{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Offline partitions",
+      "description": "IncidentBot metric offline-partitions; anomaly evidence; reducer maximum; unit partitions.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(incidentbot_fixture_kafka_offline_partitions{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Under-replicated partitions",
+      "description": "IncidentBot metric under-replicated-partitions; anomaly evidence; reducer maximum; unit partitions.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(incidentbot_fixture_kafka_under_replicated_partitions{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Consumers",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      }
+    },
+    {
+      "id": 11,
+      "title": "Consumer commit error rate",
+      "description": "IncidentBot metric consumer-commit-errors; anomaly evidence; reducer maximum; unit errors/s.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(incidentbot_fixture_kafka_consumer_commit_errors_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022}[5m]))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Consumer fetch error rate",
+      "description": "IncidentBot metric consumer-fetch-errors; anomaly evidence; reducer maximum; unit errors/s.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(incidentbot_fixture_kafka_consumer_fetch_errors_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022}[5m]))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "Consumer lag",
+      "description": "IncidentBot metric consumer-lag; anomaly evidence; reducer maximum; unit messages.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 43
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "max(incidentbot_fixture_kafka_consumer_lag{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "title": "Consumer lag growth",
+      "description": "IncidentBot metric consumer-lag-growth; anomaly evidence; reducer maximum; unit messages/s.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 10
+              },
+              {
+                "color": "red",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 43
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "max(deriv(incidentbot_fixture_kafka_consumer_lag{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022}[5m]))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "title": "Consumer group members",
+      "description": "IncidentBot metric consumer-members; anomaly evidence; reducer minimum; unit members.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 5E-324
+              },
+              {
+                "color": "green",
+                "value": 1.0000000000000002
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 51
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "min(incidentbot_fixture_kafka_consumer_group_members{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "title": "Consumer rebalance rate",
+      "description": "IncidentBot metric consumer-rebalances; anomaly evidence; reducer maximum; unit operations/s.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 51
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(incidentbot_fixture_kafka_consumer_rebalances_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022}[5m]))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "title": "Producers",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 59
+      }
+    },
+    {
+      "id": 18,
+      "title": "Producer buffer pressure",
+      "description": "IncidentBot metric producer-buffer-pressure; anomaly evidence; reducer maximum; unit ratio.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.8
+              },
+              {
+                "color": "red",
+                "value": 0.95
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 60
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "max(incidentbot_fixture_kafka_producer_buffer_ratio{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "title": "Producer error rate",
+      "description": "IncidentBot metric producer-errors; anomaly evidence; reducer maximum; unit errors/s.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 60
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(incidentbot_fixture_kafka_producer_errors_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022}[5m]))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "title": "Producer request latency",
+      "description": "IncidentBot metric producer-latency; anomaly evidence; reducer maximum; unit seconds.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 68
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "max(incidentbot_fixture_kafka_producer_request_latency_seconds{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "title": "Producer retry rate",
+      "description": "IncidentBot metric producer-retries; anomaly evidence; reducer maximum; unit retries/s.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 68
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(incidentbot_fixture_kafka_producer_retries_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022}[5m]))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "title": "Producer send rate",
+      "description": "IncidentBot metric producer-send-rate; context evidence; reducer average; unit messages/s.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000000
+              },
+              {
+                "color": "red",
+                "value": 2000000
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 76
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(incidentbot_fixture_kafka_producer_records_sent_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022}[5m]))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "title": "Producer throttle time",
+      "description": "IncidentBot metric producer-throttle; anomaly evidence; reducer maximum; unit seconds.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 76
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "max(incidentbot_fixture_kafka_producer_throttle_seconds{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "title": "Broker",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 84
+      }
+    },
+    {
+      "id": 25,
+      "title": "Broker request latency",
+      "description": "IncidentBot metric broker-request-latency; anomaly evidence; reducer maximum; unit seconds.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 85
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "max(incidentbot_fixture_kafka_broker_request_latency_seconds{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "title": "Broker throttle time",
+      "description": "IncidentBot metric broker-throttle; anomaly evidence; reducer maximum; unit seconds.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 85
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "max(incidentbot_fixture_kafka_broker_throttle_seconds{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "title": "Leader election rate",
+      "description": "IncidentBot metric leader-election-rate; anomaly evidence; reducer maximum; unit operations/s.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 93
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(incidentbot_fixture_kafka_leader_elections_total{cluster=~\u0022${clusterRegex:regex}\u0022}[5m]))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "title": "JVM",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 101
+      }
+    },
+    {
+      "id": 29,
+      "title": "JVM CPU pressure",
+      "description": "IncidentBot metric jvm-cpu-pressure; anomaly evidence; reducer maximum; unit ratio.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.8
+              },
+              {
+                "color": "red",
+                "value": 0.95
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 102
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "max(incidentbot_fixture_kafka_jvm_cpu_ratio{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "title": "JVM GC pause",
+      "description": "IncidentBot metric jvm-gc-pause; anomaly evidence; reducer maximum; unit seconds.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.2
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 102
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "max(incidentbot_fixture_kafka_jvm_gc_pause_seconds{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "title": "JVM heap pressure",
+      "description": "IncidentBot metric jvm-heap-pressure; anomaly evidence; reducer maximum; unit ratio.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.8
+              },
+              {
+                "color": "red",
+                "value": 0.95
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 110
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "max(incidentbot_fixture_kafka_jvm_heap_ratio{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "title": "JVM thread count",
+      "description": "IncidentBot metric jvm-thread-pressure; anomaly evidence; reducer maximum; unit threads.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "synthetic-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 2000
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 110
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "synthetic-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "max(incidentbot_fixture_kafka_jvm_threads{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "incidentbot",
+    "kafka",
+    "bot-only",
+    "kafka-synthetic-fixture"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "profile",
+        "label": "IncidentBot profile",
+        "type": "custom",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "query": "kafka-synthetic-fixture",
+        "options": [
+          {
+            "selected": true,
+            "text": "kafka-synthetic-fixture",
+            "value": "kafka-synthetic-fixture"
+          }
+        ],
+        "current": {
+          "selected": true,
+          "text": "kafka-synthetic-fixture",
+          "value": "kafka-synthetic-fixture"
+        },
+        "skipUrlSync": true
+      },
+      {
+        "name": "clusterRegex",
+        "label": "Kafka cluster",
+        "type": "custom",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "query": "fixture-cluster",
+        "options": [
+          {
+            "selected": true,
+            "text": "fixture-cluster",
+            "value": "fixture-cluster"
+          }
+        ],
+        "current": {
+          "selected": true,
+          "text": "fixture-cluster",
+          "value": "fixture-cluster"
+        },
+        "skipUrlSync": true
+      },
+      {
+        "name": "topicRegex",
+        "label": "Kafka topics",
+        "type": "custom",
+        "hide": 0,
+        "includeAll": false,
+        "multi": true,
+        "query": "fixture-orders",
+        "options": [
+          {
+            "selected": true,
+            "text": "fixture-orders",
+            "value": "fixture-orders"
+          }
+        ],
+        "current": {
+          "selected": true,
+          "text": [
+            "fixture-orders"
+          ],
+          "value": [
+            "fixture-orders"
+          ]
+        },
+        "skipUrlSync": true
+      },
+      {
+        "name": "consumerGroupRegex",
+        "label": "Kafka consumer groups",
+        "type": "custom",
+        "hide": 0,
+        "includeAll": false,
+        "multi": true,
+        "query": "fixture-workers",
+        "options": [
+          {
+            "selected": true,
+            "text": "fixture-workers",
+            "value": "fixture-workers"
+          }
+        ],
+        "current": {
+          "selected": true,
+          "text": [
+            "fixture-workers"
+          ],
+          "value": [
+            "fixture-workers"
+          ]
+        },
+        "skipUrlSync": true
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "IncidentBot Kafka \u2014 kafka-synthetic-fixture",
+  "uid": "incidentbot-kafka-kafka-synthet-dbf603a6",
+  "version": 1,
+  "weekStart": ""
+}

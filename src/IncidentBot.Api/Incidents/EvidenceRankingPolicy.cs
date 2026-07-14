@@ -11,6 +11,8 @@ namespace IncidentBot.Api.Incidents;
 public static class EvidenceRankingPolicy
 {
     private const int PresentationDiversityWindow = 25;
+    private const string KafkaSource = "kafka";
+    private const string KafkaCategoryPrefix = "kafka-";
 
     public static IReadOnlyList<EvidenceFinding> OrderForReport(
         IEnumerable<EvidenceFinding> findings,
@@ -132,6 +134,12 @@ public static class EvidenceRankingPolicy
 
     public static string GroupKey(EvidenceFinding finding)
     {
+        if (IsKafkaFinding(finding)
+            && !string.IsNullOrWhiteSpace(finding.ObjectType)
+            && !string.IsNullOrWhiteSpace(finding.ObjectId))
+        {
+            return $"{finding.Source}|{finding.ObjectType}|{finding.ObjectId}";
+        }
         if (finding.Category.StartsWith("pipeline", StringComparison.Ordinal))
         {
             var pipelineId = ScopeValue(finding, "pipelineId")
@@ -166,6 +174,7 @@ public static class EvidenceRankingPolicy
     {
         var category = finding.Category;
         if (category == "incident") return 1;
+        if (IsKafkaFinding(finding)) return KafkaSignalTier(finding);
         if (category == "pipeline-job-output")
         {
             if (finding.ObjectType == "pipeline-job-cancellations"
@@ -189,6 +198,45 @@ public static class EvidenceRankingPolicy
         if (SeverityRank(finding.Severity) == 2) return 7;
         return 2;
     }
+
+    internal static bool IsKafkaFinding(EvidenceFinding finding) =>
+        string.Equals(finding.Source, KafkaSource, StringComparison.Ordinal)
+        && finding.Category.StartsWith(KafkaCategoryPrefix, StringComparison.Ordinal);
+
+    internal static bool IsKafkaAnomaly(EvidenceFinding finding)
+    {
+        if (!IsKafkaFinding(finding)
+            || !string.Equals(ScopeValue(finding, "evidenceMode"), "anomaly", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return ScopeValue(finding, "thresholdState") is "warning" or "critical";
+    }
+
+    internal static bool IsKafkaContext(EvidenceFinding finding) =>
+        IsKafkaFinding(finding)
+        && string.Equals(ScopeValue(finding, "evidenceMode"), "context", StringComparison.OrdinalIgnoreCase);
+
+    private static int KafkaSignalTier(EvidenceFinding finding)
+    {
+        if (!IsKafkaAnomaly(finding)) return 2;
+
+        var thresholdState = ScopeValue(finding, "thresholdState");
+        var hardFailure = IsHardKafkaFailureCategory(finding.Category);
+        if (hardFailure && thresholdState == "critical") return 11;
+        if (thresholdState == "critical") return 10;
+        return hardFailure ? 9 : 8;
+    }
+
+    private static bool IsHardKafkaFailureCategory(string category) =>
+        category.Contains("availability", StringComparison.Ordinal)
+        || category.Contains("offline", StringComparison.Ordinal)
+        || category.Contains("under-replic", StringComparison.Ordinal)
+        || category.Contains("replication", StringComparison.Ordinal)
+        || category.Contains("leader", StringComparison.Ordinal)
+        || category.Contains("election", StringComparison.Ordinal)
+        || category.Contains("isr", StringComparison.Ordinal);
 
     private static int SeverityRank(string severity) => severity switch
     {

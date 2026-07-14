@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "environment": "test",
+  "resources": [
+    {
+      "kind": "cluster",
+      "name": "fixture-cluster",
+      "evidence": [
+        {
+          "file": "application-test.yaml",
+          "line": 2,
+          "detector": "application-config",
+          "usage": "bootstrap-servers",
+          "snippet": "bootstrap-servers: fixture-cluster"
+        }
+      ]
+    },
+    {
+      "kind": "topic",
+      "name": "fixture-orders",
+      "evidence": [
+        {
+          "file": "src/Fixture.java",
+          "line": 8,
+          "detector": "spring-kafka",
+          "usage": "listener-topic",
+          "snippet": "@KafkaListener(topics = \"fixture-orders\")"
+        }
+      ]
+    },
+    {
+      "kind": "consumer-group",
+      "name": "fixture-workers",
+      "evidence": [
+        {
+          "file": "src/Fixture.java",
+          "line": 8,
+          "detector": "spring-kafka",
+          "usage": "listener-group",
+          "snippet": "@KafkaListener(groupId = \"fixture-workers\")"
+        }
+      ]
+    }
+  ],
+  "unresolvedReferences": []
+}

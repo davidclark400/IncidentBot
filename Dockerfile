@@ -10,9 +10,11 @@ WORKDIR /src
 COPY global.json IncidentBot.sln ./
 COPY src/IncidentBot.Api/IncidentBot.Api.csproj src/IncidentBot.Api/
 COPY src/IncidentBot.Contracts/IncidentBot.Contracts.csproj src/IncidentBot.Contracts/
+COPY src/IncidentBot.Kafka/IncidentBot.Kafka.csproj src/IncidentBot.Kafka/
 RUN dotnet restore src/IncidentBot.Api/IncidentBot.Api.csproj
 COPY src/IncidentBot.Api src/IncidentBot.Api
 COPY src/IncidentBot.Contracts src/IncidentBot.Contracts
+COPY src/IncidentBot.Kafka src/IncidentBot.Kafka
 COPY config config
 COPY --from=client /src/src/IncidentBot.Api/wwwroot src/IncidentBot.Api/wwwroot
 RUN dotnet publish src/IncidentBot.Api/IncidentBot.Api.csproj -c Release -o /app/publish \

@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Text.Json.Nodes;
 using IncidentBot.Api.Domain;
 
 namespace IncidentBot.Api.Fingerprinting;
@@ -27,21 +28,28 @@ public sealed partial class FingerprintExtractor(FingerprintNormalizer normalize
         IReadOnlyList<EvidenceFinding> evidence)
     {
         var title = normalizer.Normalize(incident.Title);
-        var scopes = ValuesFromLabels(incident.Labels, ScopeKeys);
+        var scopes = ValuesFromLabels(incident.Labels, ScopeKeys)
+            .Concat(KafkaClusterScopes(evidence));
         var components = ValuesFromLabels(incident.Labels, ComponentKeys)
             .Append(FingerprintNormalizer.SafeIdentifier(incident.ServiceId));
         var symptomCategories = evidence
-            .Where(finding => !IsChangeCategory(finding.Category))
+            .Where(finding => !IsChangeCategory(finding.Category) && !IsKafkaContext(finding))
             .Select(finding => FingerprintNormalizer.SafeIdentifier(finding.Category));
         var errors = evidence
-            .Where(finding => !IsChangeCategory(finding.Category)
-                && (ErrorCategories.Contains(finding.Category) || ErrorWord().IsMatch(finding.Summary)))
+            .Where(finding => !IsChangeCategory(finding.Category) && !IsKafkaContext(finding)
+                && (ErrorCategories.Contains(finding.Category)
+                    || IsKafkaAnomaly(finding)
+                    || ErrorWord().IsMatch(finding.Summary)))
             .SelectMany(finding => new[] { RemoveActor(finding.Summary, finding.Actor), RemoveActor(finding.Excerpt, finding.Actor) })
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => normalizer.Normalize(value));
         var evidenceComponents = evidence
-            .Where(finding => finding.ObjectType is not null && IsStableComponentType(finding.ObjectType))
-            .Select(finding => normalizer.Normalize(finding.ObjectId))
+            .Where(finding => finding.ObjectType is not null
+                && !string.IsNullOrWhiteSpace(finding.ObjectId)
+                && IsStableComponentType(finding.ObjectType))
+            .Select(finding => IsKafkaFinding(finding)
+                ? $"{FingerprintNormalizer.SafeIdentifier(finding.ObjectType)}:{FingerprintNormalizer.SafeIdentifier(finding.ObjectId)}"
+                : normalizer.Normalize(finding.ObjectId))
             .Where(value => value.Length > 0 && !value.Contains("<id>", StringComparison.Ordinal));
         var locations = evidence
             .Where(finding => !IsChangeCategory(finding.Category))
@@ -89,11 +97,41 @@ public sealed partial class FingerprintExtractor(FingerprintNormalizer normalize
         .Take(MaximumItems)
         .ToArray();
 
+    private static IEnumerable<string> KafkaClusterScopes(IEnumerable<EvidenceFinding> evidence) => evidence
+        .Where(IsKafkaFinding)
+        .Select(finding => ScopeValue(finding, "cluster"))
+        .Where(value => !string.IsNullOrWhiteSpace(value))
+        .Select(value => $"cluster:{FingerprintNormalizer.SafeIdentifier(value)}");
+
     private static bool IsStableComponentType(string objectType) =>
         objectType.Contains("component", StringComparison.OrdinalIgnoreCase)
         || objectType.Contains("dependency", StringComparison.OrdinalIgnoreCase)
         || objectType.Contains("workload", StringComparison.OrdinalIgnoreCase)
-        || objectType.Contains("job", StringComparison.OrdinalIgnoreCase);
+        || objectType.Contains("job", StringComparison.OrdinalIgnoreCase)
+        || objectType.StartsWith("kafka-", StringComparison.Ordinal);
+
+    private static bool IsKafkaFinding(EvidenceFinding finding) =>
+        string.Equals(finding.Source, "kafka", StringComparison.Ordinal)
+        && finding.Category.StartsWith("kafka-", StringComparison.Ordinal);
+
+    private static bool IsKafkaContext(EvidenceFinding finding) =>
+        IsKafkaFinding(finding)
+        && string.Equals(ScopeValue(finding, "evidenceMode"), "context", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsKafkaAnomaly(EvidenceFinding finding) =>
+        IsKafkaFinding(finding)
+        && string.Equals(ScopeValue(finding, "evidenceMode"), "anomaly", StringComparison.OrdinalIgnoreCase)
+        && ScopeValue(finding, "thresholdState") is "warning" or "critical";
+
+    private static string? ScopeValue(EvidenceFinding finding, string name)
+    {
+        if (finding.Provenance["scope"] is not JsonObject scope) return null;
+        var property = scope.FirstOrDefault(item =>
+            string.Equals(item.Key, name, StringComparison.OrdinalIgnoreCase));
+        return property.Value is JsonValue value && value.TryGetValue<string>(out var text)
+            ? text.ToLowerInvariant()
+            : null;
+    }
 
     private static bool IsChangeCategory(string category) =>
         ChangeCategories.Contains(category)

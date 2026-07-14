@@ -18,13 +18,16 @@ public sealed class InvestigationProfileStore : IInvestigationProfileProvider, I
 
     private readonly ProfileDocument _document;
     private readonly EvidenceSourceRegistry evidenceSources;
+    private readonly KafkaMetricPackStore? kafkaMetricPacks;
 
     public InvestigationProfileStore(
         IOptions<IncidentBotOptions> options,
         IWebHostEnvironment environment,
-        EvidenceSourceRegistry evidenceSources)
+        EvidenceSourceRegistry evidenceSources,
+        KafkaMetricPackStore? kafkaMetricPacks = null)
     {
         this.evidenceSources = evidenceSources;
+        this.kafkaMetricPacks = kafkaMetricPacks;
         var configuredPath = options.Value.ProfilesPath;
         var path = Path.IsPathRooted(configuredPath)
             ? configuredPath
@@ -285,6 +288,16 @@ public sealed class InvestigationProfileStore : IInvestigationProfileProvider, I
                 profile.Id,
                 "Grafana",
                 profile.Grafana?.Queries.Select(query => query.Name) ?? []);
+
+            if (profile.Kafka is not null)
+            {
+                if (kafkaMetricPacks is null)
+                {
+                    throw new InvalidOperationException(
+                        $"Profile '{profile.Id}' enables Kafka but no Kafka metric catalog is available.");
+                }
+                kafkaMetricPacks.ValidateProfile(profile.Kafka);
+            }
 
             if (profile.VictoriaLogs?.Queries.Any(query => string.IsNullOrWhiteSpace(query.Name)
                     || string.IsNullOrWhiteSpace(query.Expression)) == true)

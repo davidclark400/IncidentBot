@@ -9,6 +9,8 @@ public sealed class IncidentBotOptions
     [Required]
     public string ProfilesPath { get; init; } = "config/investigation-profiles.yaml";
     [Required]
+    public string KafkaMetricPacksPath { get; init; } = "config/kafka-metric-packs.yaml";
+    [Required]
     public string PublicBaseUrl { get; init; } = "http://localhost:5173";
     [Range(1, 240)]
     public int EvidenceWindowMinutes { get; init; } = 30;

@@ -6,7 +6,7 @@ Incident Bot turns a PagerDuty incident or an authorized Slack mention into a bo
 
 - .NET 10 ASP.NET Core API and PostgreSQL-backed workers
 - signed PagerDuty V3 webhook ingestion, deduplication, and scheduled refreshes
-- native PagerDuty, Nomad, GitLab, Grafana, and VictoriaLogs connectors
+- native PagerDuty, Nomad, GitLab, Grafana, Kafka, and VictoriaLogs connectors
 - remote MCP Streamable HTTP transport with fixed allowlisted tool calls
 - version-controlled investigation profiles and safe typed query substitution
 - deterministic evidence normalization, ranking, redaction, and token budgeting
@@ -70,8 +70,23 @@ Configuration has one precedence order and each file has one job:
 2. `appsettings.Development.json` supplies the local PostgreSQL connection and relaxes ingress checks for local development.
 3. Process environment variables override either file. ASP.NET Core maps a double underscore to a section separator, so `IncidentBot__PublicBaseUrl` overrides `IncidentBot:PublicBaseUrl`.
 4. `config/investigation-profiles.yaml` only selects evidence sources and contains reviewed service-specific allowlists, resources, selectors, and queries. Connector URLs and transports are rejected by the profile schema.
+5. `config/kafka-metric-packs.yaml` is the versioned authority for reviewed Kafka PromQL, datasource UIDs, reducers, evidence modes, and thresholds. Its checked-in pack uses synthetic fixture metrics and is not enabled by the payments example.
 
 `.env` is not read by the application. It is an ignored, machine-local input used by `compose.pilot.yaml` for secrets and deployment-specific overrides of the shared application settings. The Compose file passes those values into ASP.NET Core configuration and owns pilot policy such as enabling Slack and requiring it for readiness. Start from `.env.example` for a pilot deployment. For `dotnet run`, export the same variables in the shell or inject them with your development secret manager.
+
+## Kafka application onboarding
+
+Kafka evidence is read through Grafana `POST /api/ds/query`; IncidentBot never connects to brokers or writes to Kafka, Prometheus, or Grafana. `EvidenceSources:Kafka` accepts only `Mode=api`, a Grafana base URL, and a read-only credential environment-variable name. A Kafka-enabled profile selects one reviewed metric pack, one cluster label, at least one topic, optional consumer groups, and optional threshold overrides.
+
+Use the offline repository tool to discover application resources, generate the bot-only dashboard from the same PromQL templates used at runtime, and fail closed on unresolved or uncovered resources:
+
+```bash
+dotnet run --project tools/IncidentBot.KafkaOnboarding -- scan --app-root ../orders --environment production --output /tmp/orders-kafka.json
+dotnet run --project tools/IncidentBot.KafkaOnboarding -- generate-dashboard --profiles config/investigation-profiles.yaml --profile-id orders-production --metric-packs config/kafka-metric-packs.yaml --output config/grafana/orders-production-kafka.json
+dotnet run --project tools/IncidentBot.KafkaOnboarding -- validate --inventory /tmp/orders-kafka.json --profiles config/investigation-profiles.yaml --profile-id orders-production --metric-packs config/kafka-metric-packs.yaml --dashboard config/grafana/orders-production-kafka.json
+```
+
+Repeat `generate-dashboard` with `--check` in CI. The repository-owned `$onboard-kafka-app` skill runs this workflow and stops before patching when required resources or exporter mappings remain unresolved.
 
 ## Generated API contracts
 
@@ -250,7 +265,7 @@ GitLab diff hunks under `relevantPaths` become immutable `CodeReference` values 
 
 ## MCP mode
 
-Any source connector can use an API or remote MCP implementation independently. Change that source's application configuration; the profile continues to contain only its allowed resources:
+Most source connectors can use an API or remote MCP implementation independently. Kafka v1 is deliberately API-only and rejects MCP mode; PagerDuty incident pull also remains native. Change an eligible source's application configuration; the profile continues to contain only its allowed resources:
 
 ```json
 {

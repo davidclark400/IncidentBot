@@ -13,6 +13,7 @@ public sealed class EvidenceSourceConfiguration(IOptions<EvidenceSourceOptions> 
         EvidenceSourceRegistry.Nomad => configured.Nomad,
         EvidenceSourceRegistry.GitLab => configured.GitLab,
         EvidenceSourceRegistry.Grafana => configured.Grafana,
+        EvidenceSourceRegistry.Kafka => configured.Kafka,
         EvidenceSourceRegistry.VictoriaLogs => configured.VictoriaLogs,
         _ => throw new InvalidOperationException($"Unknown evidence source '{source}'.")
     };
