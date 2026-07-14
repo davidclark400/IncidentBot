@@ -14,6 +14,7 @@ public sealed class InvestigationProfile
     public string PagerDutyServiceId { get; init; } = "";
     public string Team { get; init; } = "";
     public string SlackChannel { get; init; } = "";
+    public Dictionary<string, string> SlackPromptLabels { get; init; } = [];
     public List<ProfileSelector> Selectors { get; init; } = [];
     public PagerDutyScope? PagerDuty { get; init; }
     public NomadScope? Nomad { get; init; }

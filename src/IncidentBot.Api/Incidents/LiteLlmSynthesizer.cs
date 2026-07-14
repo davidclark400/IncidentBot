@@ -22,8 +22,19 @@ public sealed class LiteLlmSynthesizer(
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly SemanticEvidenceCompressor EvidenceCompressor = new();
 
-    public async Task<AiSynthesis> SynthesizeAsync(
+    public Task<AiSynthesis> SynthesizeAsync(
         IncidentRecord incident,
+        IReadOnlyList<ConnectorResult> results,
+        AiSynthesis? previous,
+        CancellationToken cancellationToken) =>
+        SynthesizeAsync(
+            InvestigationSubject.FromIncident(incident),
+            results,
+            previous,
+            cancellationToken);
+
+    public async Task<AiSynthesis> SynthesizeAsync(
+        InvestigationSubject subject,
         IReadOnlyList<ConnectorResult> results,
         AiSynthesis? previous,
         CancellationToken cancellationToken)
@@ -34,7 +45,7 @@ public sealed class LiteLlmSynthesizer(
             return new AiSynthesis("skipped", null, [], [], [], null);
         }
 
-        var digestPayload = BuildDigestPayload(incident, results, options.Value.InputCharacterBudget);
+        var digestPayload = BuildDigestPayload(subject, results, options.Value.InputCharacterBudget);
         var digest = digestPayload.Text;
         var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(digest)));
         if (previous?.Status == "complete" && previous.EvidenceHash == hash && previous.SummaryParts is { Count: > 0 })
@@ -157,7 +168,7 @@ public sealed class LiteLlmSynthesizer(
                 .Where(reference => digestPayload.CodeReferenceIds.Contains(reference.Id))
                 .GroupBy(reference => reference.Id, StringComparer.Ordinal)
                 .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
-            var referenceCatalog = BuildReferenceCatalog(results, incident.TriggeredAt)
+            var referenceCatalog = BuildReferenceCatalog(results, subject.TriggeredAt)
                 .Where(reference => digestPayload.ReferenceIds.Contains(reference.Id))
                 .ToDictionary(reference => reference.Id, StringComparer.Ordinal);
             var summaryParts = BoundSummaryParts(parsed.SummaryParts, referenceCatalog);
@@ -242,33 +253,42 @@ public sealed class LiteLlmSynthesizer(
         }
     }
 
+    internal static string BuildDigest(InvestigationSubject subject, IReadOnlyList<ConnectorResult> results, int budget) =>
+        BuildDigestPayload(subject, results, budget).Text;
+
     internal static string BuildDigest(IncidentRecord incident, IReadOnlyList<ConnectorResult> results, int budget) =>
-        BuildDigestPayload(incident, results, budget).Text;
+        BuildDigest(InvestigationSubject.FromIncident(incident), results, budget);
 
     internal static DigestPayload BuildDigestPayload(
         IncidentRecord incident,
+        IReadOnlyList<ConnectorResult> results,
+        int budget) =>
+        BuildDigestPayload(InvestigationSubject.FromIncident(incident), results, budget);
+
+    internal static DigestPayload BuildDigestPayload(
+        InvestigationSubject subject,
         IReadOnlyList<ConnectorResult> results,
         int budget)
     {
         var exact = EvidenceCompressor.Compress(
             results,
-            incident.TriggeredAt,
+            subject.TriggeredAt,
             collapseSemantically: false);
         var exactPayload = BuildDigestPayloadCore(
-            incident, results, budget, exact, semanticCompressionApplied: false);
+            subject, results, budget, exact, semanticCompressionApplied: false);
         if (!exactPayload.BudgetConstrained) return exactPayload;
 
         var compressed = EvidenceCompressor.Compress(
             results,
-            incident.TriggeredAt,
+            subject.TriggeredAt,
             collapseSemantically: true);
         if (compressed.OutputGroupCount >= exact.OutputGroupCount) return exactPayload;
         return BuildDigestPayloadCore(
-            incident, results, budget, compressed, semanticCompressionApplied: true);
+            subject, results, budget, compressed, semanticCompressionApplied: true);
     }
 
     private static DigestPayload BuildDigestPayloadCore(
-        IncidentRecord incident,
+        InvestigationSubject subject,
         IReadOnlyList<ConnectorResult> results,
         int budget,
         SemanticCompressionResult compression,
@@ -279,7 +299,7 @@ public sealed class LiteLlmSynthesizer(
         var evidenceCatalog = new Dictionary<string, EvidenceFinding>(StringComparer.Ordinal);
         var codeReferenceIds = new HashSet<string>(StringComparer.Ordinal);
         var referenceIds = new HashSet<string>(StringComparer.Ordinal);
-        var orderedGroups = OrderCompressedGroupsForSynthesis(compression.Groups, incident.TriggeredAt);
+        var orderedGroups = OrderCompressedGroupsForSynthesis(compression.Groups, subject.TriggeredAt);
         var compressibleEvidenceIds = compression.Groups
             .SelectMany(group => group.Representatives)
             .Select(finding => finding.Id)
@@ -288,13 +308,13 @@ public sealed class LiteLlmSynthesizer(
         var budgetConstrained = false;
 
         if (!AppendLine("INCIDENT", budget)
-            || !AppendLine($"title={Sanitize(incident.Title, 300)}", budget)
-            || !AppendLine($"service={Sanitize(incident.ServiceId, 128)} state={incident.State} urgency={Sanitize(incident.Urgency, 32)} triggered={incident.TriggeredAt:O}", budget)
+            || !AppendLine($"title={Sanitize(subject.Title, 300)}", budget)
+            || !AppendLine($"service={Sanitize(subject.ServiceId, 128)} state={subject.State} urgency={Sanitize(subject.Urgency, 32)} triggered={subject.TriggeredAt:O}", budget)
             || !AppendLine("AVAILABLE REFERENCES (use exact reference_id values in summaryParts)", budget))
         {
             return Complete();
         }
-        foreach (var reference in BuildReferenceCatalog(results, incident.TriggeredAt, compressibleEvidenceIds).Take(40))
+        foreach (var reference in BuildReferenceCatalog(results, subject.TriggeredAt, compressibleEvidenceIds).Take(40))
         {
             var line = $"- reference_id={reference.Id} kind={reference.Kind} label={Sanitize(reference.Label, 160)}";
             if (!AppendLine(line, budget)) return Complete();

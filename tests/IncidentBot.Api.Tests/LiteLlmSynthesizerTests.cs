@@ -199,11 +199,12 @@ public sealed class LiteLlmSynthesizerTests
         TestConfiguration.Credentials(),
         NullLogger<LiteLlmSynthesizer>.Instance);
 
-    private static IncidentRecord Incident() => new(
-        Guid.Parse("11111111-1111-1111-1111-111111111111"), "PD-1", "payments", "profile", "Incident title",
-        "high", IncidentState.Triggered, DateTimeOffset.Parse("2026-07-11T10:00:00Z"),
-        DateTimeOffset.Parse("2026-07-11T10:00:01Z"), 1, "collecting", false, null, "#incidents", null,
-        new Dictionary<string, string>());
+    private static InvestigationSubject Incident() => new(
+        "payments",
+        "Incident title",
+        "high",
+        IncidentState.Triggered,
+        DateTimeOffset.Parse("2026-07-11T10:00:00Z"));
 
     private static ConnectorResult Result(int index)
     {

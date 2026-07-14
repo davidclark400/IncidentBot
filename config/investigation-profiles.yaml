@@ -7,6 +7,9 @@ profiles:
     pagerDutyServiceId: P123PAYMENTS
     team: payments
     slackChannel: "#payments-incidents"
+    slackPromptLabels:
+      service: payments-api
+      environment: production
     pagerDuty: {}
 
     nomad:

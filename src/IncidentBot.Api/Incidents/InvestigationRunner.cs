@@ -17,7 +17,7 @@ public interface IInvestigationProfileProvider
 public interface IInvestigationSynthesizer
 {
     Task<AiSynthesis> SynthesizeAsync(
-        IncidentRecord incident,
+        InvestigationSubject subject,
         IReadOnlyList<ConnectorResult> results,
         AiSynthesis? previous,
         CancellationToken cancellationToken);
@@ -145,7 +145,11 @@ public sealed class InvestigationRunner(
         var results = collection.ConnectorResults;
         var previous = await repository.GetReportAsync(incident.Id, cancellationToken);
         logger.LogDebug("Synthesis started with {ConnectorResultCount} connector results", results.Count);
-        var ai = await synthesizer.SynthesizeAsync(incident, results, previous?.Ai, cancellationToken);
+        var ai = await synthesizer.SynthesizeAsync(
+            InvestigationSubject.FromIncident(incident),
+            results,
+            previous?.Ai,
+            cancellationToken);
         var report = composer.Compose(
             incident,
             profile,

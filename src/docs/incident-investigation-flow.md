@@ -202,6 +202,8 @@ The outbox worker leases `slack.report` items for one minute. A failure releases
 
 Slack Socket Mode acknowledges interactive envelopes immediately. A valid restart action retires unfinished work for the incident, sets status back to `queued`, inserts a new immediate work item and a delayed Slack check, cancels an in-flight run when present, and refreshes the message.
 
+An optional, separate `app_mention` path handles ad-hoc questions without pretending they are PagerDuty incidents. The Socket Mode adapter authenticates the bot identity, accepts only the configured workspace/channel, acknowledges before dispatch, deduplicates and rate-limits events, and uses a bounded queue. A first LiteLLM call selects only reviewed query names and exact profile-owned `slackPromptLabels`; the compiler narrows the profile and emits canonical YAML. Native connectors collect within the normal bounds, then the existing source-neutral synthesis interface performs the second LiteLLM call. One plain-text `chat.postMessage` reply is posted to `thread_ts = event.thread_ts ?? event.ts`. PagerDuty and MCP transports are excluded from this path, and its in-memory queue intentionally does not claim durable delivery.
+
 ## 8. Failure semantics
 
 | Failure | Result |

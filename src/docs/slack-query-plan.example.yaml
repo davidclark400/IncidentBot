@@ -1,0 +1,16 @@
+version: 1
+profileId: payments-production
+question: Are payment timeouts rising in production after the latest deploy?
+labels:
+  environment: production
+  service: payments-api
+sources:
+  - source: gitlab
+    queryNames: []
+  - source: grafana
+    queryNames:
+      - HTTP 5xx rate
+      - p99 latency
+  - source: victorialogs
+    queryNames:
+      - Panics and timeouts

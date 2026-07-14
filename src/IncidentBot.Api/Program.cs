@@ -49,6 +49,19 @@ builder.Services.AddOptions<SlackOptions>()
     .Validate(value => CredentialVariableName.IsValid(value.BotTokenEnv)
         && CredentialVariableName.IsValid(value.AppTokenEnv),
         "Slack credential settings must be valid environment-variable names.")
+    .Validate(value => !value.Enabled ||
+            Uri.TryCreate(value.ApiBaseUrl, UriKind.Absolute, out var slackApi) &&
+            slackApi.Scheme == Uri.UriSchemeHttps,
+        "Slack:ApiBaseUrl must use HTTPS when Slack is enabled.")
+    .Validate(value => !value.PromptMentionsEnabled || value.Enabled,
+        "Slack prompt mentions require Slack to be enabled.")
+    .Validate(value => !value.PromptMentionsEnabled || value.PromptChannelProfiles.Count > 0,
+        "Slack prompt mentions require at least one channel-to-profile mapping.")
+    .Validate(value => value.PromptChannelProfiles.All(mapping =>
+            !string.IsNullOrWhiteSpace(mapping.Key) && !string.IsNullOrWhiteSpace(mapping.Value)),
+        "Slack prompt channel and profile identifiers must not be blank.")
+    .Validate(value => value.PromptRequestsPerMinutePerUser <= value.PromptRequestsPerMinute,
+        "Slack per-user prompt rate must not exceed the global prompt rate.")
     .ValidateOnStart();
 builder.Services.AddOptions<LiteLlmOptions>()
     .Bind(builder.Configuration.GetSection(LiteLlmOptions.SectionName))
@@ -130,11 +143,18 @@ else
     builder.Services.AddSingleton<LiteLlmSynthesizer>();
     builder.Services.AddSingleton<IInvestigationSynthesizer>(services => services.GetRequiredService<LiteLlmSynthesizer>());
     builder.Services.AddSingleton<IInvestigationProfileProvider>(services => services.GetRequiredService<InvestigationProfileStore>());
+    builder.Services.AddSingleton<ISlackQueryProfileProvider>(services => services.GetRequiredService<InvestigationProfileStore>());
     builder.Services.AddSingleton<IIncidentReportReader, RepositoryIncidentReportReader>();
     builder.Services.AddSingleton<InvestigationRunner>();
     builder.Services.AddSingleton<InvestigationRunRegistry>();
     builder.Services.AddSingleton<InvestigationRestartService>();
     builder.Services.AddSingleton<SlackPublisher>();
+    builder.Services.AddSingleton<SlackInteractiveHandler>();
+    builder.Services.AddSingleton<SlackQueryPlanCompiler>();
+    builder.Services.AddSingleton<ISlackQueryPlanner, LiteLlmSlackQueryPlanner>();
+    builder.Services.AddSingleton<SlackPromptInvestigator>();
+    builder.Services.AddSingleton<ISlackReplyPublisher, SlackReplyPublisher>();
+    builder.Services.AddSingleton<SlackMentionHandler>();
 
     builder.Services.AddHostedService<DatabaseInitializer>();
     builder.Services.AddHostedService<DataSourceConnectivityChecker>();

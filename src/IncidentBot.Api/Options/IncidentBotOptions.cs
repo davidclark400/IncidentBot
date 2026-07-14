@@ -71,6 +71,7 @@ public sealed class SlackOptions
 {
     public const string SectionName = "Slack";
     public bool Enabled { get; init; }
+    public bool PromptMentionsEnabled { get; init; }
     [Required, Url]
     public string ApiBaseUrl { get; init; } = "https://slack.com/api";
     [Required]
@@ -81,6 +82,22 @@ public sealed class SlackOptions
     public int TimeoutSeconds { get; init; } = 20;
     [Range(1, 60)]
     public int ReconnectDelaySeconds { get; init; } = 5;
+    [Range(1024, 1048576)]
+    public int MaximumEnvelopeBytes { get; init; } = 262144;
+    [Range(1, 4000)]
+    public int MaximumPromptCharacters { get; init; } = 2000;
+    [Range(1, 1000)]
+    public int PromptQueueCapacity { get; init; } = 32;
+    [Range(1, 4)]
+    public int PromptWorkerCount { get; init; } = 1;
+    [Range(1, 60)]
+    public int PromptRequestsPerMinutePerUser { get; init; } = 6;
+    [Range(1, 600)]
+    public int PromptRequestsPerMinute { get; init; } = 30;
+    [Range(5, 300)]
+    public int PromptTimeoutSeconds { get; init; } = 90;
+    public bool AllowExternalSharedChannels { get; init; }
+    public Dictionary<string, string> PromptChannelProfiles { get; init; } = [];
 }
 
 public sealed class LiteLlmOptions
@@ -90,6 +107,8 @@ public sealed class LiteLlmOptions
     public string BaseUrl { get; init; } = "http://litellm.internal:4000";
     [Required]
     public string Model { get; init; } = "incident-summary";
+    [Required]
+    public string QueryPlannerModel { get; init; } = "incident-query-planner";
     [Required]
     public string ApiKeyEnv { get; init; } = "LITELLM_API_KEY";
     [Range(1, 120)]

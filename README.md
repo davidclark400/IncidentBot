@@ -1,6 +1,6 @@
 # Incident Bot
 
-Incident Bot turns a PagerDuty incident into a live, read-only investigation. It collects only the resources allowlisted for that service, builds a deterministic timeline, asks LiteLLM for a bounded synthesis, updates one Slack message, and serves a real-time React report.
+Incident Bot turns a PagerDuty incident or an authorized Slack mention into a bounded, read-only investigation. It collects only reviewed resources and query templates, asks LiteLLM for an evidence-grounded synthesis, posts to Slack, and serves a real-time React incident report.
 
 ## What is implemented
 
@@ -16,6 +16,7 @@ Incident Bot turns a PagerDuty incident into a live, read-only investigation. It
 - immutable GitLab commit/path/line references that LiteLLM diagnoses must cite by known ID
 - required OpenAI-compatible LiteLLM synthesis with graceful failure to the deterministic report
 - transactional Slack delivery using one message per incident
+- bounded Slack `app_mention` queries with a validated, canonical YAML plan and threaded response
 - SignalR notifications and a live React incident route
 - independent 30-day report and 365-day compact recurrence retention, health endpoints, and focused security/determinism tests
 
@@ -166,7 +167,7 @@ docker build -t incident-bot:local .
 
 Production readiness returns HTTP `503` and lists only missing environment-variable names and configuration issues until the deployment is safe to exercise. It checks the webhook secret, the LiteLLM credential when collection is enabled, enabled Slack credentials, active evidence-source credentials, ingress identity enforcement, the public URL, MCP consistency, and leftover `.example` hosts on active endpoints. Development continues to return HTTP `200` while showing the same production preflight diagnostically.
 
-For Slack delivery and restart actions, enable Socket Mode and interactivity, give the bot the minimum `chat:write` access needed for its target channels, and give the app-level token `connections:write`. Use read-only, resource-scoped tokens for PagerDuty and every evidence connector.
+For Slack delivery and restart actions, enable Socket Mode and interactivity, give the bot the minimum `chat:write` access needed for its target channels, and give the app-level token `connections:write`. To accept mentions, also give the bot `app_mentions:read`, subscribe it to the `app_mention` bot event, and reinstall the app after changing scopes. The checked-in [Slack app manifest](src/docs/slack-app-manifest.yaml) captures those bot settings. Use read-only, resource-scoped tokens for PagerDuty and every evidence connector.
 
 Before accepting live traffic, take a PostgreSQL backup, record the restore command, and run one controlled signed incident through triggered, acknowledged, restarted, and resolved states. Verify one Slack message is updated in place, the report link opens through the identity proxy, all configured sources report expected health, and the incident remains available after an API container restart. The application records database schema versions automatically; take a fresh backup before deploying a newer schema version.
 
@@ -181,6 +182,48 @@ POST https://incident-bot.internal/api/webhooks/pagerduty/v3
 Set `PAGERDUTY_WEBHOOK_SECRET` to the subscription secret. Production rejects requests without a valid `X-PagerDuty-Signature` HMAC. Webhook event IDs are persisted before returning `202 Accepted`, making retries idempotent. Payloads are limited to 256 KiB by default; only runtime query keys and labels required by the selected profile are retained from `custom_details`.
 
 For a local unsigned smoke test, use `ASPNETCORE_ENVIRONMENT=Development` and send a V3 payload whose service ID and custom details match an investigation profile.
+
+## Slack mention investigations
+
+The existing Socket Mode connection can also accept a question such as:
+
+```text
+@IncidentBot Are payment timeouts rising in production after the latest deploy?
+```
+
+Enable the bounded example and map the exact Slack channel ID to one reviewed investigation profile:
+
+```bash
+Slack__Enabled=true
+Slack__PromptMentionsEnabled=true
+Slack__PromptChannelProfiles__C0123456789=payments-production
+LiteLlm__QueryPlannerModel=incident-query-planner
+```
+
+Fix every template label the Slack planner may use inside that reviewed profile:
+
+```yaml
+slackPromptLabels:
+  service: payments-api
+  environment: production
+```
+
+The channel mapping is authorization, not a default. Slack sends channel IDs rather than `#channel-name`, and a prompt can never select a profile outside its configured channel. External Slack Connect channels are rejected unless `Slack:AllowExternalSharedChannels` is deliberately enabled. Defaults admit at most six requests per user and thirty total requests per minute; adjust `Slack:PromptRequestsPerMinutePerUser` and `Slack:PromptRequestsPerMinute` deliberately for the workspace.
+
+For each accepted mention Incident Bot:
+
+1. acknowledges the Socket Mode envelope before any LLM or datasource work, deduplicates the Slack `event_id`, and places the request on a bounded in-memory queue;
+2. asks the query-planner model for a strict, narrow plan containing only labels, source names, and reviewed query-template names;
+3. validates that plan against the channel-bound profile and deterministically emits a canonical YAML audit artifact like [this example](src/docs/slack-query-plan.example.yaml);
+4. runs only the selected existing connectors with the normal item, byte, timeout, resource, and adaptive-window limits;
+5. sends the normalized connector results through the existing incident synthesis model; and
+6. posts one response in the mention's thread containing the answer and canonical YAML plan.
+
+The model cannot author a connector URL, credential, tenant, project, namespace, datasource UID, raw PromQL/LogSQL expression, MCP tool, label scope, or collection limit. Slack label values are fixed in the profile's `slackPromptLabels` map and the plan must copy them exactly. The YAML is an audit artifact; execution uses the compiled, narrowed copy of the deployment-owned profile. PagerDuty is intentionally unavailable to ad-hoc prompts because a mention has no verified PagerDuty incident identity. MCP transports are also rejected for this path because an untrusted natural-language question must not reach a remote tool before its reads are enforced; use the native, resource-scoped adapters in the working example.
+
+The example queue and deduplication cache are process-local and intentionally bounded. A crash after acknowledgement can lose an accepted prompt, and a restart forgets prior event IDs; use durable, attempt-limited work storage before treating this conversational path as a delivery-guaranteed production workflow.
+
+The implementation follows Slack's current [Socket Mode](https://docs.slack.dev/apis/events-api/using-socket-mode/), [`app_mention`](https://docs.slack.dev/reference/events/app_mention/), and [`chat.postMessage`](https://docs.slack.dev/reference/methods/chat.postMessage/) contracts. The bot requires `app_mentions:read` and `chat:write`; its app-level token requires `connections:write`.
 
 ## API and live updates
 

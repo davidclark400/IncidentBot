@@ -39,6 +39,21 @@ public sealed record InvestigationContext(
     IReadOnlyDictionary<string, string> Labels,
     InvestigationProfile Profile);
 
+public sealed record InvestigationSubject(
+    string ServiceId,
+    string Title,
+    string Urgency,
+    IncidentState State,
+    DateTimeOffset TriggeredAt)
+{
+    public static InvestigationSubject FromIncident(IncidentRecord incident) => new(
+        incident.ServiceId,
+        incident.Title,
+        incident.Urgency,
+        incident.State,
+        incident.TriggeredAt);
+}
+
 public sealed record EvidenceScope(
     DateTimeOffset Start,
     DateTimeOffset End,

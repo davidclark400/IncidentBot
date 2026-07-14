@@ -2,13 +2,14 @@ using IncidentBot.Api.Domain;
 using IncidentBot.Api.Connectors;
 using IncidentBot.Api.Options;
 using IncidentBot.Api.Incidents;
+using IncidentBot.Api.Security;
 using Microsoft.Extensions.Options;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
 namespace IncidentBot.Api.Profiles;
 
-public sealed class InvestigationProfileStore : IInvestigationProfileProvider
+public sealed class InvestigationProfileStore : IInvestigationProfileProvider, ISlackQueryProfileProvider
 {
     private static readonly HashSet<string> StandardLabelKeys = new(StringComparer.Ordinal)
     {
@@ -181,6 +182,16 @@ public sealed class InvestigationProfileStore : IInvestigationProfileProvider
         return matches[0].Profile;
     }
 
+    public SlackQueryProfile Resolve(string profileId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
+        var profile = _document.Profiles.SingleOrDefault(candidate =>
+            string.Equals(candidate.Id, profileId, StringComparison.Ordinal));
+        return profile is null
+            ? throw new InvalidOperationException($"Investigation profile '{profileId}' was not found.")
+            : new SlackQueryProfile(_document.Revision, profile);
+    }
+
     private static int BestSelectorScore(InvestigationProfile profile, IReadOnlyDictionary<string, string> labels)
     {
         if (profile.Selectors.Count == 0)
@@ -253,16 +264,57 @@ public sealed class InvestigationProfileStore : IInvestigationProfileProvider
                 throw new InvalidOperationException($"Profile '{profile.Id}' uses a sensitive label name in a selector.");
             }
 
+            if (profile.SlackPromptLabels.Count > SlackQueryPlanCompiler.MaximumLabels)
+            {
+                throw new InvalidOperationException(
+                    $"Profile '{profile.Id}' contains too many Slack prompt labels.");
+            }
+            var templateRenderer = new SafeTemplateRenderer();
+            foreach (var label in profile.SlackPromptLabels)
+            {
+                templateRenderer.Render("{{" + label.Key + "}}", profile.SlackPromptLabels);
+            }
+
             if (profile.Grafana?.Queries.Any(query => string.IsNullOrWhiteSpace(query.DatasourceUid)
-                    || string.IsNullOrWhiteSpace(query.Expression)) == true)
+                    || string.IsNullOrWhiteSpace(query.Expression)
+                    || string.IsNullOrWhiteSpace(query.Name)) == true)
             {
                 throw new InvalidOperationException($"Profile '{profile.Id}' contains an invalid Grafana query.");
             }
+            ValidateUniqueQueryNames(
+                profile.Id,
+                "Grafana",
+                profile.Grafana?.Queries.Select(query => query.Name) ?? []);
+
+            if (profile.VictoriaLogs?.Queries.Any(query => string.IsNullOrWhiteSpace(query.Name)
+                    || string.IsNullOrWhiteSpace(query.Expression)) == true)
+            {
+                throw new InvalidOperationException(
+                    $"Profile '{profile.Id}' contains an invalid VictoriaLogs query.");
+            }
+            ValidateUniqueQueryNames(
+                profile.Id,
+                "VictoriaLogs",
+                profile.VictoriaLogs?.Queries.Select(query => query.Name) ?? []);
 
             if (profile.VictoriaLogs is { StreamFilters.Count: 0 })
             {
                 throw new InvalidOperationException($"Profile '{profile.Id}' must scope VictoriaLogs with streamFilters.");
             }
+        }
+    }
+
+    private static void ValidateUniqueQueryNames(
+        string profileId,
+        string source,
+        IEnumerable<string> queryNames)
+    {
+        var duplicate = queryNames.GroupBy(value => value, StringComparer.Ordinal)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicate is not null)
+        {
+            throw new InvalidOperationException(
+                $"Profile '{profileId}' contains duplicate {source} query name '{duplicate.Key}'.");
         }
     }
 

@@ -272,7 +272,7 @@ public sealed class InvestigationRunnerTests
     private sealed class Synthesizer : IInvestigationSynthesizer
     {
         public Task<AiSynthesis> SynthesizeAsync(
-            IncidentRecord incident,
+            InvestigationSubject subject,
             IReadOnlyList<ConnectorResult> results,
             AiSynthesis? previous,
             CancellationToken cancellationToken) =>
@@ -284,7 +284,7 @@ public sealed class InvestigationRunnerTests
         public IReadOnlyList<ConnectorResult> Results { get; private set; } = [];
 
         public Task<AiSynthesis> SynthesizeAsync(
-            IncidentRecord incident,
+            InvestigationSubject subject,
             IReadOnlyList<ConnectorResult> results,
             AiSynthesis? previous,
             CancellationToken cancellationToken)

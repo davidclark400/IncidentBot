@@ -29,6 +29,7 @@ public sealed class ProfileTests
         Assert.NotEmpty(profile.Grafana.Queries);
         Assert.NotEmpty(profile.VictoriaLogs!.StreamFilters);
         Assert.NotEmpty(profile.GitLab!.Projects);
+        Assert.Equal("production", profile.SlackPromptLabels["environment"]);
     }
 
     [Fact]
@@ -194,6 +195,65 @@ public sealed class ProfileTests
         Assert.Equal("blue", filtered["tenant"]);
         Assert.DoesNotContain("diagnostic_noise", filtered.Keys);
         Assert.DoesNotContain("auth_token", filtered.Keys);
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidNamedQueryDocuments))]
+    public void QueryTemplateAuthorityKeysMustBeNamedAndUnique(string yaml)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"incidentbot-profile-{Guid.NewGuid():N}.yaml");
+        File.WriteAllText(path, yaml);
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() => new InvestigationProfileStore(
+                Microsoft.Extensions.Options.Options.Create(new IncidentBotOptions { ProfilesPath = path }),
+                new TestEnvironment(),
+                EmptySources()));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    public static IEnumerable<object[]> InvalidNamedQueryDocuments()
+    {
+        yield return
+        [
+            """
+            version: 2
+            revision: test-v2
+            fallbackSlackChannel: "#incidents"
+            profiles:
+              - id: payments
+                pagerDutyServiceId: P123
+                grafana:
+                  queries:
+                    - name: Errors
+                      datasourceUid: prometheus
+                      expression: up
+                    - name: Errors
+                      datasourceUid: prometheus
+                      expression: rate(errors[5m])
+            """
+        ];
+        yield return
+        [
+            """
+            version: 2
+            revision: test-v2
+            fallbackSlackChannel: "#incidents"
+            profiles:
+              - id: payments
+                pagerDutyServiceId: P123
+                victoriaLogs:
+                  streamFilters:
+                    service: payments
+                  queries:
+                    - name: ""
+                      expression: level:error
+            """
+        ];
     }
 
     private sealed class TestEnvironment : IWebHostEnvironment
