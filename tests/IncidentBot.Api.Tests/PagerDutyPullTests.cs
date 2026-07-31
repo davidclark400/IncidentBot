@@ -4,6 +4,7 @@ using IncidentBot.Api.Connectors;
 using IncidentBot.Api.Domain;
 using IncidentBot.Api.Incidents;
 using IncidentBot.Api.Options;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
 namespace IncidentBot.Api.Tests;
@@ -146,6 +147,36 @@ public sealed class PagerDutyPullTests
         Assert.Equal(resolvedAt, webhook.OccurredAt);
     }
 
+    [Fact]
+    public async Task TriggerMapsProfileSelectionFailureToConflict()
+    {
+        var selectionFailure = new InvestigationProfileSelectionException(
+            "No investigation profile selector matched PagerDuty service 'PSERVICE'.",
+            new InvalidOperationException("profile selection failed"));
+        var service = new PagerDutyPullService(
+            CreateClient("PAGERDUTY_TEST_TOKEN", new DelegateHandler(TriggerLookupResponse)),
+            new ThrowingIncidentIntake(selectionFailure));
+
+        var exception = await Assert.ThrowsAsync<PagerDutyPullException>(() =>
+            service.TriggerAsync("PINCIDENT", CancellationToken.None));
+
+        Assert.Equal(StatusCodes.Status409Conflict, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task TriggerDoesNotMapOtherIntakeInvalidOperationToConflict()
+    {
+        var persistenceFailure = new InvalidOperationException("incident upsert failed");
+        var service = new PagerDutyPullService(
+            CreateClient("PAGERDUTY_TEST_TOKEN", new DelegateHandler(TriggerLookupResponse)),
+            new ThrowingIncidentIntake(persistenceFailure));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.TriggerAsync("PINCIDENT", CancellationToken.None));
+
+        Assert.Same(persistenceFailure, exception);
+    }
+
     private static PagerDutyIncidentClient CreateClient(string credentialEnvironmentVariable, HttpMessageHandler handler) =>
         new(
             new StubHttpClientFactory(handler),
@@ -161,6 +192,22 @@ public sealed class PagerDutyPullTests
     {
         Content = new StringContent(content, Encoding.UTF8, "application/json")
     };
+
+    private static HttpResponseMessage TriggerLookupResponse(HttpRequestMessage request) =>
+        request.RequestUri!.AbsolutePath.EndsWith("/alerts", StringComparison.Ordinal)
+            ? Json("""{ "alerts": [] }""")
+            : Json("""
+                { "incident": {
+                  "id": "PINCIDENT",
+                  "incident_number": 42,
+                  "title": "Checkout latency",
+                  "status": "triggered",
+                  "urgency": "high",
+                  "created_at": "2026-07-13T08:00:00Z",
+                  "last_status_change_at": "2026-07-13T08:05:00Z",
+                  "service": { "id": "PSERVICE", "summary": "Checkout API" }
+                } }
+                """);
 
     private static HttpRequestMessage Clone(HttpRequestMessage request)
     {
@@ -182,5 +229,14 @@ public sealed class PagerDutyPullTests
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken) => Task.FromResult(response(request));
+    }
+
+    private sealed class ThrowingIncidentIntake(Exception exception) : IIncidentIntake
+    {
+        public Task<(Guid IncidentId, bool IsDuplicate)> AcceptAsync(
+            PagerDutyWebhookEvent incident,
+            ReadOnlyMemory<byte> rawPayload,
+            CancellationToken cancellationToken) =>
+            Task.FromException<(Guid IncidentId, bool IsDuplicate)>(exception);
     }
 }

@@ -3,14 +3,12 @@ using System.Text;
 using System.Text.Json;
 using IncidentBot.Api.Connectors;
 using IncidentBot.Api.Domain;
-using IncidentBot.Api.Profiles;
 
 namespace IncidentBot.Api.Incidents;
 
 public sealed class PagerDutyPullService(
     PagerDutyIncidentClient pagerDuty,
-    InvestigationProfileStore profiles,
-    IIncidentStore incidents) : IPagerDutyPullService
+    IIncidentIntake intake) : IPagerDutyPullService
 {
     public Task<PagerDutyIncidentPage> GetRecentAsync(
         DateTimeOffset since,
@@ -25,20 +23,7 @@ public sealed class PagerDutyPullService(
         var incident = await pagerDuty.GetAsync(pagerDutyIncidentId, cancellationToken);
         if (incident is null) return null;
 
-        InvestigationProfile profile;
-        try
-        {
-            profile = profiles.Resolve(incident.ServiceId, incident.Labels);
-        }
-        catch (InvalidOperationException)
-        {
-            throw new PagerDutyPullException(
-                "No unambiguous investigation profile matches this PagerDuty incident.",
-                StatusCodes.Status409Conflict);
-        }
-
-        var labels = profiles.FilterPersistedLabels(profile, incident.Labels);
-        var webhook = CreateWebhook(incident, labels);
+        var webhook = CreateWebhook(incident, incident.Labels);
         var payload = JsonSerializer.SerializeToUtf8Bytes(new
         {
             source = "pagerduty-pull",
@@ -47,7 +32,17 @@ public sealed class PagerDutyPullService(
             createdAt = incident.CreatedAt,
             lastStatusChangeAt = incident.LastStatusChangeAt
         });
-        var accepted = await incidents.AcceptWebhookAsync(webhook, profile, payload, cancellationToken);
+        (Guid IncidentId, bool IsDuplicate) accepted;
+        try
+        {
+            accepted = await intake.AcceptAsync(webhook, payload, cancellationToken);
+        }
+        catch (InvestigationProfileSelectionException)
+        {
+            throw new PagerDutyPullException(
+                "No unambiguous investigation profile matches this PagerDuty incident.",
+                StatusCodes.Status409Conflict);
+        }
         return new PulledIncidentTrigger(
             accepted.IncidentId,
             $"/incidents/{accepted.IncidentId}",

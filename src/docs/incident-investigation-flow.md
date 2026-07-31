@@ -225,20 +225,21 @@ An optional, separate `app_mention` path handles ad-hoc questions without preten
 | Concern | Primary implementation |
 | --- | --- |
 | Webhook validation and parsing | `IncidentBot.Api/Incidents/PagerDutyWebhookEndpoints.cs`, `IncidentBot.Api/Security/PagerDutySignatureValidator.cs` |
-| Profile selection and safe labels | `IncidentBot.Api/Profiles/InvestigationProfileStore.cs`, `IncidentBot.Api/Profiles/ProfileModels.cs` |
-| Intake persistence and scheduling | `IncidentBot.Api/Infrastructure/IncidentRepository.cs` |
+| Profile selection and safe labels | `IncidentBot.Api/Incidents/IncidentIntake.cs`, `IncidentBot.Api/Profiles/InvestigationProfileStore.cs`, `IncidentBot.Api/Profiles/ProfileModels.cs` |
+| Intake persistence and scheduling | `IncidentBot.Api/Incidents/IncidentIntake.cs`, `IncidentBot.Api/Infrastructure/IncidentRepository.cs` |
 | Durable leasing and retry | `IncidentBot.Api/Infrastructure/DurableQueueRepository.cs`, `IncidentBot.Api/Incidents/DurableWorker.cs` |
-| Investigation orchestration | `IncidentBot.Api/Incidents/InvestigationRunner.cs`, `IncidentBot.Api/Incidents/InvestigationWorker.cs` |
-| Source selection and connectors | `IncidentBot.Api/Connectors/EvidenceSourceRegistry.cs`, `IncidentBot.Api/Connectors/*EvidenceConnector.cs` |
-| Kafka metric packs and offline onboarding | `IncidentBot.Kafka/*`, `IncidentBot.Api/Profiles/KafkaMetricPackStore.cs`, `tools/IncidentBot.KafkaOnboarding/Program.cs` |
+| Investigation orchestration and report transitions | `IncidentBot.Api/Incidents/InvestigationRunner.cs`, `IncidentBot.Api/Incidents/InvestigationReportTransitions.cs`, `IncidentBot.Api/Incidents/InvestigationWorker.cs` |
+| Source selection, response budgets, and connectors | `IncidentBot.Api/Connectors/EvidenceSourceRegistry.cs`, `IncidentBot.Api/Connectors/ConnectorResponseBudget.cs`, `IncidentBot.Api/Connectors/*EvidenceConnector.cs` |
+| Kafka metric plans and offline onboarding | `IncidentBot.Kafka/KafkaMetricPlan.cs`, `IncidentBot.Kafka/KafkaMetricCatalog.cs`, `IncidentBot.Api/Profiles/KafkaMetricPlanStore.cs`, `tools/IncidentBot.KafkaOnboarding/Program.cs` |
 | MCP normalization boundary | `IncidentBot.Api/Connectors/McpConnectorResultBoundary.cs` |
 | Evidence priority | `IncidentBot.Api/Incidents/EvidenceRankingPolicy.cs` |
 | AI digest and response validation | `IncidentBot.Api/Incidents/LiteLlmSynthesizer.cs`, `IncidentBot.Api/Incidents/Compression/SemanticEvidenceCompressor.cs` |
 | Deterministic report projection | `IncidentBot.Api/Incidents/ReportComposer.cs` |
-| Fingerprinting and recurrence | `IncidentBot.Api/Fingerprinting/*` |
+| Fingerprinting and recurrence policy | `IncidentBot.Api/Fingerprinting/RecurrencePolicy.cs`, `IncidentBot.Api/Fingerprinting/RecurrenceCoordinator.cs`, `IncidentBot.Api/Fingerprinting/ProblemRepository.cs` |
 | Database schema | `IncidentBot.Api/Infrastructure/DatabaseInitializer.cs` |
-| SignalR output | `IncidentBot.Api/Incidents/SignalRIncidentUpdatePublisher.cs`, `IncidentBot.Client/src/features/incidents/useIncidentSession.ts` |
-| Slack rendering and restart | `IncidentBot.Api/Incidents/SlackPublisher.cs`, `IncidentBot.Api/Incidents/OutboxWorker.cs`, `IncidentBot.Api/Incidents/SlackSocketModeWorker.cs` |
+| SignalR output and live investigation session | `IncidentBot.Api/Incidents/SignalRIncidentUpdatePublisher.cs`, `IncidentBot.Client/src/features/incidents/liveInvestigationSession.ts`, `IncidentBot.Client/src/features/incidents/useIncidentSession.ts` |
+| Slack prompt admission, rendering, and restart | `IncidentBot.Api/Incidents/SlackPromptAdmission.cs`, `IncidentBot.Api/Incidents/SlackPublisher.cs`, `IncidentBot.Api/Incidents/OutboxWorker.cs`, `IncidentBot.Api/Incidents/SlackSocketModeWorker.cs` |
+| Demo replay | `IncidentBot.Api/Demo/DemoReplay.cs`, `IncidentBot.Api/Demo/DemoIncidentStore.cs`, `IncidentBot.Api/Demo/DemoIncidentWorker.cs` |
 
 ## Diagram maintenance
 

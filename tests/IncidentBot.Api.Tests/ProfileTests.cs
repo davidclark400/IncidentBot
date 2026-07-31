@@ -163,40 +163,6 @@ public sealed class ProfileTests
         Assert.Null(profile.VictoriaLogs);
     }
 
-    [Fact]
-    public void PersistedLabelsKeepOnlyRuntimeAndSelectedProfileKeys()
-    {
-        var path = Path.Combine(AppContext.BaseDirectory, "config", "investigation-profiles.yaml");
-        var store = new InvestigationProfileStore(
-            Microsoft.Extensions.Options.Options.Create(new IncidentBotOptions { ProfilesPath = path }),
-            new TestEnvironment(),
-            EmptySources());
-        var selectedProfile = new InvestigationProfile
-        {
-            Selectors =
-            [
-                new ProfileSelector
-                {
-                    Labels = new Dictionary<string, string> { ["tenant"] = "blue" }
-                }
-            ]
-        };
-
-        var filtered = store.FilterPersistedLabels(selectedProfile, new Dictionary<string, string>
-        {
-            ["service"] = "P123PAYMENTS",
-            ["environment"] = "production",
-            ["tenant"] = "blue",
-            ["diagnostic_noise"] = "not needed after routing",
-            ["auth_token"] = "must-not-persist"
-        });
-
-        Assert.Equal("production", filtered["environment"]);
-        Assert.Equal("blue", filtered["tenant"]);
-        Assert.DoesNotContain("diagnostic_noise", filtered.Keys);
-        Assert.DoesNotContain("auth_token", filtered.Keys);
-    }
-
     [Theory]
     [MemberData(nameof(InvalidNamedQueryDocuments))]
     public void QueryTemplateAuthorityKeysMustBeNamedAndUnique(string yaml)

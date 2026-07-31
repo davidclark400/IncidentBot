@@ -9,8 +9,9 @@ public sealed class KafkaDashboardTests
     {
         var generator = new KafkaDashboardGenerator();
         var catalog = KafkaMetricCatalogTests.SharedCatalog();
-        var first = generator.Generate("orders-production", KafkaMetricCatalogTests.Scope(), catalog);
-        var second = generator.Generate("orders-production", KafkaMetricCatalogTests.Scope(), catalog);
+        var plan = catalog.CompilePlan(KafkaMetricCatalogTests.Scope());
+        var first = generator.Generate("orders-production", plan);
+        var second = generator.Generate("orders-production", plan);
         var root = JsonNode.Parse(first)!.AsObject();
         var panels = root["panels"]!.AsArray();
 
@@ -42,12 +43,13 @@ public sealed class KafkaDashboardTests
         {
             var generator = new KafkaDashboardGenerator();
             var catalog = KafkaMetricCatalogTests.SharedCatalog();
-            var generated = generator.Generate("orders-production", KafkaMetricCatalogTests.Scope(), catalog);
+            var plan = catalog.CompilePlan(KafkaMetricCatalogTests.Scope());
+            var generated = generator.Generate("orders-production", plan);
             File.WriteAllText(path, generated);
 
-            Assert.True(generator.Check(path, "orders-production", KafkaMetricCatalogTests.Scope(), catalog, out _));
+            Assert.True(generator.Check(path, "orders-production", plan, out _));
             File.AppendAllText(path, " ");
-            Assert.False(generator.Check(path, "orders-production", KafkaMetricCatalogTests.Scope(), catalog, out var diagnostic));
+            Assert.False(generator.Check(path, "orders-production", plan, out var diagnostic));
             Assert.Contains("stale", diagnostic, StringComparison.OrdinalIgnoreCase);
         }
         finally
@@ -70,8 +72,7 @@ public sealed class KafkaDashboardTests
         var root = JsonNode.Parse(
             new KafkaDashboardGenerator().Generate(
                 "orders-production",
-                scope,
-                KafkaMetricCatalogTests.SharedCatalog()))!.AsObject();
+                KafkaMetricCatalogTests.SharedCatalog().CompilePlan(scope)))!.AsObject();
         var groupVariable = root["templating"]!["list"]!.AsArray()
             .Single(variable => variable!["name"]!.GetValue<string>() == "consumerGroupRegex");
         var groupExpressions = root["panels"]!.AsArray()
@@ -106,8 +107,7 @@ public sealed class KafkaDashboardTests
         var root = JsonNode.Parse(
             new KafkaDashboardGenerator().Generate(
                 "orders-production",
-                scope,
-                KafkaMetricCatalogTests.SharedCatalog()))!.AsObject();
+                KafkaMetricCatalogTests.SharedCatalog().CompilePlan(scope)))!.AsObject();
         var variable = root["templating"]!["list"]!.AsArray()
             .Single(item => item!["name"]!.GetValue<string>() == "consumerGroupRegex");
 
@@ -120,11 +120,12 @@ public sealed class KafkaDashboardTests
     {
         var catalog = KafkaMetricCatalogTests.SharedCatalog();
         var scope = KafkaMetricCatalogTests.Scope();
-        var metric = catalog.GetPack(scope.MetricPackId).Metrics
+        var plan = catalog.CompilePlan(scope);
+        var metric = plan.Metrics
             .Single(item => item.Id == "broker-availability");
-        var thresholds = catalog.EffectiveThresholds(metric);
+        var thresholds = metric.Thresholds;
         var root = JsonNode.Parse(
-            new KafkaDashboardGenerator().Generate("orders-production", scope, catalog))!.AsObject();
+            new KafkaDashboardGenerator().Generate("orders-production", plan))!.AsObject();
         var steps = root["panels"]!.AsArray()
             .Single(panel => panel?["title"]?.GetValue<string>() == metric.Title)!["fieldConfig"]!["defaults"]!["thresholds"]!["steps"]!
             .AsArray();

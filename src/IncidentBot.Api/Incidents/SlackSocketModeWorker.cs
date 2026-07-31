@@ -15,6 +15,7 @@ public sealed class SlackSocketModeWorker(
     SlackMentionHandler mentionHandler,
     ISlackReplyPublisher replyPublisher,
     ICredentialProvider credentials,
+    TimeProvider timeProvider,
     ILogger<SlackSocketModeWorker> logger) : BackgroundService
 {
     private const string BusyReply =
@@ -50,14 +51,7 @@ public sealed class SlackSocketModeWorker(
             }
         }
 
-        var queue = Channel.CreateBounded<SlackMention>(new BoundedChannelOptions(
-            options.Value.PromptQueueCapacity)
-        {
-            FullMode = BoundedChannelFullMode.Wait,
-            SingleReader = options.Value.PromptWorkerCount == 1,
-            SingleWriter = true,
-            AllowSynchronousContinuations = false
-        });
+        var admission = new SlackPromptAdmission(options.Value, timeProvider);
         var rejections = Channel.CreateBounded<SlackMention>(new BoundedChannelOptions(1)
         {
             FullMode = BoundedChannelFullMode.DropWrite,
@@ -67,17 +61,12 @@ public sealed class SlackSocketModeWorker(
         });
         var workers = options.Value.PromptMentionsEnabled
             ? Enumerable.Range(0, options.Value.PromptWorkerCount)
-                .Select(_ => ProcessMentionsAsync(queue.Reader, stoppingToken))
+                .Select(_ => ProcessMentionsAsync(admission, stoppingToken))
                 .ToArray()
             : [];
         var rejectionWorker = options.Value.PromptMentionsEnabled
             ? ProcessRejectionsAsync(rejections.Reader, stoppingToken)
             : Task.CompletedTask;
-        var dedupe = new SlackEventDedupe(Math.Max(64, options.Value.PromptQueueCapacity * 4));
-        var rateLimiter = new SlackPromptRateLimiter(
-            options.Value.PromptRequestsPerMinutePerUser,
-            options.Value.PromptRequestsPerMinute,
-            TimeProvider.System);
         SlackBotIdentity? botIdentity = null;
 
         try
@@ -95,10 +84,8 @@ public sealed class SlackSocketModeWorker(
                     await ReceiveAsync(
                         socketUrl,
                         botIdentity,
-                        queue.Writer,
+                        admission,
                         rejections.Writer,
-                        dedupe,
-                        rateLimiter,
                         stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -124,7 +111,7 @@ public sealed class SlackSocketModeWorker(
         }
         finally
         {
-            queue.Writer.TryComplete();
+            admission.Complete();
             rejections.Writer.TryComplete();
             await Task.WhenAll(workers.Append(rejectionWorker));
         }
@@ -221,10 +208,8 @@ public sealed class SlackSocketModeWorker(
     private async Task ReceiveAsync(
         Uri socketUrl,
         SlackBotIdentity? botIdentity,
-        ChannelWriter<SlackMention> mentionWriter,
+        SlackPromptAdmission admission,
         ChannelWriter<SlackMention> rejectionWriter,
-        SlackEventDedupe dedupe,
-        SlackPromptRateLimiter rateLimiter,
         CancellationToken cancellationToken)
     {
         using var socket = new ClientWebSocket();
@@ -280,40 +265,34 @@ public sealed class SlackSocketModeWorker(
                 continue;
             }
 
-            if (botIdentity is not { } identity ||
-                !SlackMentionParser.TryParseEventsApiEnvelope(
-                    root,
-                    identity,
-                    options.Value.MaximumPromptCharacters,
-                    options.Value.AllowExternalSharedChannels,
-                    out var mention) ||
-                mention is null)
+            if (botIdentity is not { } identity)
             {
                 continue;
             }
 
-            if (!dedupe.TryRemember(mention.EventId))
+            var result = admission.Admit(root, identity);
+            if (result is not
+                {
+                    Outcome: SlackPromptAdmissionOutcome.Busy,
+                    BusyMention: { } busyMention
+                })
             {
                 continue;
             }
 
-            if (!rateLimiter.TryAcquire(mention.TeamId, mention.ChannelId, mention.UserId) ||
-                !mentionWriter.TryWrite(mention))
-            {
-                // Never wait for chat.postMessage in the socket receive/ACK loop. One
-                // separately supervised slot coalesces overload replies.
-                rejectionWriter.TryWrite(mention);
-            }
+            // Never wait for chat.postMessage in the socket receive/ACK loop. One
+            // separately supervised slot coalesces overload replies.
+            rejectionWriter.TryWrite(busyMention);
         }
     }
 
     private async Task ProcessMentionsAsync(
-        ChannelReader<SlackMention> reader,
+        SlackPromptAdmission admission,
         CancellationToken stoppingToken)
     {
         try
         {
-            await foreach (var mention in reader.ReadAllAsync(stoppingToken))
+            await foreach (var mention in admission.ReadAllAsync(stoppingToken))
             {
                 try
                 {
@@ -452,219 +431,4 @@ public sealed class SlackSocketModeWorker(
 
     private static string GetSlackError(JsonElement root) =>
         GetString(root, "error") ?? "unknown_error";
-}
-
-internal readonly record struct SlackBotIdentity(string TeamId, string UserId);
-
-internal static class SlackMentionParser
-{
-    internal static bool TryParseEventsApiEnvelope(
-        JsonElement envelope,
-        SlackBotIdentity ownIdentity,
-        int maximumPromptCharacters,
-        bool allowExternalSharedChannels,
-        out SlackMention? mention)
-    {
-        mention = null;
-        if (GetString(envelope, "type") != "events_api" ||
-            !envelope.TryGetProperty("payload", out var payload) ||
-            payload.ValueKind != JsonValueKind.Object ||
-            GetString(payload, "type") != "event_callback" ||
-            !string.Equals(
-                GetString(payload, "team_id"),
-                ownIdentity.TeamId,
-                StringComparison.Ordinal) ||
-            !payload.TryGetProperty("event", out var slackEvent) ||
-            slackEvent.ValueKind != JsonValueKind.Object ||
-            GetString(slackEvent, "type") != "app_mention" ||
-            (!allowExternalSharedChannels &&
-             (GetBoolean(payload, "is_ext_shared_channel") ||
-              GetBoolean(slackEvent, "is_ext_shared_channel"))) ||
-            IsBotEvent(slackEvent))
-        {
-            return false;
-        }
-
-        var eventId = GetString(payload, "event_id");
-        var channelId = GetString(slackEvent, "channel");
-        var userId = GetString(slackEvent, "user");
-        var messageTimestamp = GetString(slackEvent, "ts");
-        var text = GetString(slackEvent, "text");
-        if (string.IsNullOrWhiteSpace(eventId) ||
-            string.IsNullOrWhiteSpace(channelId) ||
-            string.IsNullOrWhiteSpace(userId) ||
-            string.Equals(userId, ownIdentity.UserId, StringComparison.Ordinal) ||
-            string.IsNullOrWhiteSpace(messageTimestamp) ||
-            text is null)
-        {
-            return false;
-        }
-
-        var prompt = NormalizePrompt(text, ownIdentity.UserId);
-        if (string.IsNullOrWhiteSpace(prompt) || prompt.Length > maximumPromptCharacters)
-        {
-            return false;
-        }
-
-        mention = new SlackMention(
-            eventId,
-            ownIdentity.TeamId,
-            channelId,
-            userId,
-            messageTimestamp,
-            GetString(slackEvent, "thread_ts"),
-            prompt);
-        return true;
-    }
-
-    internal static string NormalizePrompt(string text, string ownUserId)
-    {
-        var ownMention = $"<@{ownUserId}>";
-        return text
-            .Replace(ownMention, string.Empty, StringComparison.Ordinal)
-            .Replace("&lt;", "<", StringComparison.Ordinal)
-            .Replace("&gt;", ">", StringComparison.Ordinal)
-            .Replace("&amp;", "&", StringComparison.Ordinal)
-            .Trim();
-    }
-
-    private static bool IsBotEvent(JsonElement slackEvent) =>
-        HasNonEmptyString(slackEvent, "bot_id") ||
-        HasNonEmptyString(slackEvent, "app_id") ||
-        slackEvent.TryGetProperty("bot_profile", out var botProfile) &&
-        botProfile.ValueKind == JsonValueKind.Object ||
-        string.Equals(
-            GetString(slackEvent, "subtype"),
-            "bot_message",
-            StringComparison.Ordinal);
-
-    private static bool HasNonEmptyString(JsonElement element, string property) =>
-        !string.IsNullOrWhiteSpace(GetString(element, property));
-
-    private static bool GetBoolean(JsonElement element, string property) =>
-        element.TryGetProperty(property, out var value) &&
-        value.ValueKind == JsonValueKind.True;
-
-    private static string? GetString(JsonElement element, string property) =>
-        element.ValueKind == JsonValueKind.Object &&
-        element.TryGetProperty(property, out var value) &&
-        value.ValueKind == JsonValueKind.String
-            ? value.GetString()
-            : null;
-}
-
-internal sealed class SlackEventDedupe
-{
-    private readonly int _capacity;
-    private readonly HashSet<string> _eventIds = new(StringComparer.Ordinal);
-    private readonly Queue<string> _oldestFirst = new();
-    private readonly Lock _gate = new();
-
-    internal SlackEventDedupe(int capacity)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(capacity);
-        _capacity = capacity;
-    }
-
-    internal int Count
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return _eventIds.Count;
-            }
-        }
-    }
-
-    internal bool TryRemember(string eventId)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
-        lock (_gate)
-        {
-            if (!_eventIds.Add(eventId))
-            {
-                return false;
-            }
-
-            _oldestFirst.Enqueue(eventId);
-            if (_oldestFirst.Count > _capacity)
-            {
-                _eventIds.Remove(_oldestFirst.Dequeue());
-            }
-            return true;
-        }
-    }
-}
-
-internal sealed class SlackPromptRateLimiter
-{
-    private static readonly TimeSpan Window = TimeSpan.FromMinutes(1);
-    private readonly int _perUserLimit;
-    private readonly int _globalLimit;
-    private readonly TimeProvider _timeProvider;
-    private readonly Queue<DateTimeOffset> _global = new();
-    private readonly Dictionary<string, Queue<DateTimeOffset>> _principals = new(StringComparer.Ordinal);
-    private readonly Lock _gate = new();
-
-    internal SlackPromptRateLimiter(
-        int perUserLimit,
-        int globalLimit,
-        TimeProvider timeProvider)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(perUserLimit);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(globalLimit);
-        _perUserLimit = perUserLimit;
-        _globalLimit = globalLimit;
-        _timeProvider = timeProvider;
-    }
-
-    internal bool TryAcquire(string teamId, string channelId, string userId)
-    {
-        var principal = $"{teamId}\u001f{channelId}\u001f{userId}";
-        var now = _timeProvider.GetUtcNow();
-        var cutoff = now - Window;
-        lock (_gate)
-        {
-            Prune(_global, cutoff);
-            foreach (var stale in _principals
-                         .Where(item =>
-                         {
-                             Prune(item.Value, cutoff);
-                             return item.Value.Count == 0;
-                         })
-                         .Select(item => item.Key)
-                         .ToArray())
-            {
-                _principals.Remove(stale);
-            }
-
-            if (_global.Count >= _globalLimit)
-            {
-                return false;
-            }
-
-            if (!_principals.TryGetValue(principal, out var perUser))
-            {
-                perUser = new Queue<DateTimeOffset>();
-                _principals.Add(principal, perUser);
-            }
-            if (perUser.Count >= _perUserLimit)
-            {
-                return false;
-            }
-
-            _global.Enqueue(now);
-            perUser.Enqueue(now);
-            return true;
-        }
-    }
-
-    private static void Prune(Queue<DateTimeOffset> values, DateTimeOffset cutoff)
-    {
-        while (values.TryPeek(out var value) && value <= cutoff)
-        {
-            values.Dequeue();
-        }
-    }
 }

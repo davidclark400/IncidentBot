@@ -12,23 +12,18 @@ public sealed class KafkaDashboardGenerator
 
     public string Generate(
         string profileId,
-        KafkaProfileScope scope,
-        KafkaMetricCatalog catalog)
+        KafkaMetricPlan plan)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
-        ArgumentNullException.ThrowIfNull(scope);
-        ArgumentNullException.ThrowIfNull(catalog);
-        catalog.ValidateProfile(scope);
-        var pack = catalog.GetPack(scope.MetricPackId);
+        ArgumentNullException.ThrowIfNull(plan);
         var panels = new JsonArray();
         var panelId = 1;
         var y = 0;
 
         foreach (var row in KafkaMetricCatalog.DashboardRows)
         {
-            var metrics = pack.Metrics
+            var metrics = plan.Metrics
                 .Where(metric => metric.DashboardRow == row)
-                .OrderBy(metric => metric.Id, StringComparer.Ordinal)
                 .ToArray();
             panels.Add(new JsonObject
             {
@@ -42,11 +37,8 @@ public sealed class KafkaDashboardGenerator
             for (var index = 0; index < metrics.Length; index++)
             {
                 var metric = metrics[index];
-                var thresholds = catalog.EffectiveThresholds(
-                    metric,
-                    scope.ThresholdOverrides.GetValueOrDefault(metric.Id));
                 var panelY = y + index / 2 * 8;
-                panels.Add(MetricPanel(panelId++, metric, thresholds, scope, index % 2 * 12, panelY));
+                panels.Add(MetricPanel(panelId++, metric, index % 2 * 12, panelY));
             }
             y += Math.Max(1, (int)Math.Ceiling(metrics.Length / 2d)) * 8;
         }
@@ -55,7 +47,7 @@ public sealed class KafkaDashboardGenerator
         {
             ["annotations"] = new JsonObject { ["list"] = new JsonArray() },
             ["description"] =
-                $"Bot-only Kafka evidence dashboard for IncidentBot profile {profileId}; generated from metric pack {pack.Id}.",
+                $"Bot-only Kafka evidence dashboard for IncidentBot profile {profileId}; generated from metric pack {plan.MetricPackId}.",
             ["editable"] = false,
             ["fiscalYearStartMonth"] = 0,
             ["graphTooltip"] = 1,
@@ -70,12 +62,12 @@ public sealed class KafkaDashboardGenerator
             {
                 ["list"] = new JsonArray(
                     Variable("profile", "IncidentBot profile", [profileId], multi: false),
-                    Variable("clusterRegex", "Kafka cluster", [scope.Cluster], multi: false),
-                    Variable("topicRegex", "Kafka topics", scope.Topics, multi: true),
+                    Variable("clusterRegex", "Kafka cluster", [plan.Cluster], multi: false),
+                    Variable("topicRegex", "Kafka topics", plan.Topics, multi: true),
                     Variable(
                         "consumerGroupRegex",
                         "Kafka consumer groups",
-                        scope.ConsumerGroups,
+                        plan.ConsumerGroups,
                         multi: true))
             },
             ["time"] = new JsonObject { ["from"] = "now-30m", ["to"] = "now" },
@@ -92,11 +84,10 @@ public sealed class KafkaDashboardGenerator
     public bool Check(
         string outputPath,
         string profileId,
-        KafkaProfileScope scope,
-        KafkaMetricCatalog catalog,
+        KafkaMetricPlan plan,
         out string diagnostic)
     {
-        var expected = Generate(profileId, scope, catalog);
+        var expected = Generate(profileId, plan);
         if (!File.Exists(outputPath))
         {
             diagnostic = $"Generated Kafka dashboard is missing: {outputPath}";
@@ -114,13 +105,11 @@ public sealed class KafkaDashboardGenerator
 
     private static JsonObject MetricPanel(
         int panelId,
-        KafkaMetricDefinition metric,
-        KafkaEffectiveThresholds thresholds,
-        KafkaProfileScope scope,
+        KafkaPlannedMetric metric,
         int x,
         int y)
     {
-        var steps = ThresholdSteps(metric.Direction, thresholds);
+        var steps = ThresholdSteps(metric.Thresholds.Direction, metric.Thresholds);
         return new JsonObject
         {
             ["id"] = panelId,
@@ -162,7 +151,7 @@ public sealed class KafkaDashboardGenerator
             {
                 ["datasource"] = Datasource(metric.DatasourceUid),
                 ["editorMode"] = "code",
-                ["expr"] = KafkaPromQlRenderer.RenderForGrafanaVariables(metric.PromQl, scope),
+                ["expr"] = metric.DashboardPromQl,
                 ["legendFormat"] = "__auto",
                 ["range"] = true,
                 ["refId"] = "A"

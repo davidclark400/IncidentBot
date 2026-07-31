@@ -1,8 +1,11 @@
 using System.Text.RegularExpressions;
+using PromQL.Parser;
+using PromQL.Parser.Ast;
+using PromQlParser = PromQL.Parser.Parser;
 
 namespace IncidentBot.Kafka;
 
-public static partial class KafkaPromQlRenderer
+internal static partial class KafkaPromQlRenderer
 {
     private static readonly HashSet<string> AllowedPlaceholders = new(StringComparer.Ordinal)
     {
@@ -45,20 +48,119 @@ public static partial class KafkaPromQlRenderer
     }
 
     public static IReadOnlyDictionary<string, IReadOnlySet<string>> ScopeLabelKeys(string template)
+        => AnalyzeSelectorScopes(template, new HashSet<string>(StringComparer.Ordinal));
+
+    internal static IReadOnlyDictionary<string, IReadOnlySet<string>> ValidateSelectorScopes(
+        string template,
+        IReadOnlySet<string> requiredPlaceholders)
+        => AnalyzeSelectorScopes(template, requiredPlaceholders);
+
+    private static IReadOnlyDictionary<string, IReadOnlySet<string>> AnalyzeSelectorScopes(
+        string template,
+        IReadOnlySet<string> requiredPlaceholders)
     {
         _ = ValidateTemplate(template);
+        Expr expression;
+        try
+        {
+            expression = PromQlParser.ParseExpression(template);
+            var expressionType = expression.CheckType();
+            if (expressionType is not (PromQL.Parser.ValueType.Scalar or PromQL.Parser.ValueType.Vector))
+            {
+                throw new InvalidOperationException(
+                    "Kafka PromQL must return a scalar or instant vector; " +
+                    $"root expression type '{expressionType}' is not supported for range queries.");
+            }
+        }
+        catch (Exception exception) when (
+            exception is Superpower.ParseException or TypeChecker.InvalidTypeException)
+        {
+            throw new InvalidOperationException(
+                $"Kafka PromQL is not a valid supported expression: {exception.Message}",
+                exception);
+        }
+
+        var selectors = new DepthFirstExpressionVisitor()
+            .GetExpressions(expression)
+            .OfType<VectorSelector>()
+            .ToArray();
+        if (selectors.Length == 0)
+        {
+            throw new InvalidOperationException("Kafka PromQL must contain at least one vector selector.");
+        }
+
         var labels = AllowedPlaceholders.ToDictionary(
             placeholder => placeholder,
             _ => new HashSet<string>(StringComparer.Ordinal),
             StringComparer.Ordinal);
-        foreach (Match match in ScopedLabelMatcher().Matches(template))
+        var parsedOccurrences = AllowedPlaceholders.ToDictionary(
+            placeholder => placeholder,
+            _ => 0,
+            StringComparer.Ordinal);
+        foreach (var selector in selectors)
         {
-            labels[match.Groups["placeholder"].Value].Add(match.Groups["label"].Value);
+            var selectorPlaceholders = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var matcher in selector.LabelMatchers?.Matchers ?? [])
+            {
+                if (matcher.Operator != Operators.LabelMatch.Regexp
+                    || !TryGetPlaceholder(matcher.Value.Value, out var placeholder))
+                {
+                    continue;
+                }
+
+                selectorPlaceholders.Add(placeholder);
+                labels[placeholder].Add(matcher.LabelName);
+                parsedOccurrences[placeholder]++;
+            }
+
+            var missing = requiredPlaceholders
+                .Where(placeholder => !selectorPlaceholders.Contains(placeholder))
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            if (missing.Length > 0)
+            {
+                var selectorName = selector.MetricIdentifier?.Value ?? "label-only selector";
+                throw new InvalidOperationException(
+                    "Every Kafka PromQL vector selector must carry the metric resource scope; " +
+                    $"selector '{selectorName}' is missing {string.Join(", ", missing)}.");
+            }
         }
+
+        var textualOccurrences = Placeholder().Matches(template)
+            .Select(match => match.Groups[1].Value)
+            .GroupBy(placeholder => placeholder, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+        foreach (var (placeholder, count) in textualOccurrences)
+        {
+            if (parsedOccurrences[placeholder] != count)
+            {
+                throw new InvalidOperationException(
+                    $"Kafka PromQL placeholder '{placeholder}' must belong to a parsed vector-selector regex matcher.");
+            }
+        }
+
         return labels.ToDictionary(
             item => item.Key,
             item => (IReadOnlySet<string>)item.Value,
             StringComparer.Ordinal);
+    }
+
+    private static bool TryGetPlaceholder(string value, out string placeholder)
+    {
+        if (value.StartsWith("{{", StringComparison.Ordinal)
+            && value.EndsWith("}}", StringComparison.Ordinal)
+            && value.Length > 4)
+        {
+            var candidate = value[2..^2];
+            if (AllowedPlaceholders.Contains(candidate))
+            {
+                placeholder = candidate;
+                return true;
+            }
+        }
+
+        placeholder = "";
+        return false;
     }
 
     public static void ValidateScope(KafkaProfileScope scope)

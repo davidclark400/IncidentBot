@@ -49,21 +49,6 @@ public sealed class FingerprintGenerator
         return string.Join('\n', parts);
     }
 
-    public static string ProblemKey(FingerprintFeatures features, string familyHash)
-    {
-        var service = KeyPart(features.ServiceId);
-        var component = features.Components
-            .FirstOrDefault(value => !string.Equals(value, features.ServiceId, StringComparison.Ordinal))
-            ?? features.TitleTokens.FirstOrDefault()
-            ?? "PROBLEM";
-        return $"{service}-{KeyPart(component)}-{familyHash[..4].ToUpperInvariant()}";
-    }
-
     private static string Join(IEnumerable<string> values) => string.Join('|', values.Order(StringComparer.Ordinal));
     private static string Hash(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
-    private static string KeyPart(string value)
-    {
-        var cleaned = new string(value.Where(char.IsLetterOrDigit).Take(12).ToArray()).ToUpperInvariant();
-        return string.IsNullOrEmpty(cleaned) ? "PROBLEM" : cleaned;
-    }
 }

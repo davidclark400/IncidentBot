@@ -88,7 +88,8 @@ public sealed class ProblemRepository(
         }
         await using (var advisory = new NpgsqlCommand("select pg_advisory_xact_lock(hashtextextended($1, 0))", connection, transaction))
         {
-            advisory.Parameters.AddWithValue($"{fingerprint.AlgorithmVersion}|{fingerprint.Features.ServiceId}|{fingerprint.Features.ProfileId}|{fingerprint.ExactHash}");
+            advisory.Parameters.AddWithValue(
+                $"association|{fingerprint.AlgorithmVersion}|{fingerprint.Features.ServiceId}|{fingerprint.Features.ProfileId}");
             await advisory.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -189,34 +190,88 @@ public sealed class ProblemRepository(
         await using var fingerprints = new NpgsqlCommand("delete from incident_fingerprints where created_at < $1", connection, transaction);
         fingerprints.Parameters.AddWithValue(cutoff);
         var deleted = await fingerprints.ExecuteNonQueryAsync(cancellationToken);
+
+        // MatchOrCreate locks problem groups before mutating their occurrences. Lock every group
+        // affected by retention in the same deterministic order so the two transactions cannot
+        // form a group -> occurrence / occurrence -> group deadlock.
+        var affectedGroups = new List<Guid>();
+        await using (var groupLocks = new NpgsqlCommand("""
+            select g.id
+            from problem_groups g
+            where exists (
+                select 1 from problem_occurrences o
+                where o.problem_group_id = g.id and o.updated_at < $1)
+            order by g.id
+            for update of g
+            """, connection, transaction))
+        {
+            groupLocks.Parameters.AddWithValue(cutoff);
+            await using var reader = await groupLocks.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                affectedGroups.Add(reader.GetGuid(0));
+            }
+        }
+
         await using var occurrences = new NpgsqlCommand("delete from problem_occurrences where updated_at < $1", connection, transaction);
         occurrences.Parameters.AddWithValue(cutoff);
         deleted += await occurrences.ExecuteNonQueryAsync(cancellationToken);
-        await using var refresh = new NpgsqlCommand("""
-            with stats as (
-                select problem_group_id, count(*)::integer as occurrence_count, min(occurred_at) as first_seen,
-                       max(occurred_at) as last_seen, coalesce(bool_or(active), false) as active,
-                       count(*) filter (where occurred_at >= $1)::integer as recent_count
-                from problem_occurrences group by problem_group_id
-            )
-            update problem_groups g set
-                occurrence_count = stats.occurrence_count,
-                first_seen = stats.first_seen,
-                last_seen = stats.last_seen,
-                lifecycle_state = case
-                    when not stats.active then 'resolved'
-                    when stats.recent_count >= $2 then 'escalating'
-                    when g.lifecycle_state = 'regressed' then 'regressed'
-                    when stats.occurrence_count = 1 then 'new'
-                    else 'ongoing'
-                end,
-                resolved_at = case when not stats.active then coalesce(g.resolved_at, now()) else null end,
-                updated_at = now()
-            from stats where g.id = stats.problem_group_id
-            """, connection, transaction);
-        refresh.Parameters.AddWithValue(policy.EscalationCutoff(timeProvider.GetUtcNow()));
-        refresh.Parameters.AddWithValue(policy.EscalationCount);
-        await refresh.ExecuteNonQueryAsync(cancellationToken);
+
+        if (affectedGroups.Count > 0)
+        {
+            var statsByGroup = new Dictionary<Guid, GroupStats>();
+            await using (var stats = new NpgsqlCommand("""
+                select problem_group_id, count(*)::integer, min(occurred_at), max(occurred_at),
+                       coalesce(bool_or(active), false),
+                       count(*) filter (where occurred_at >= $2)::integer
+                from problem_occurrences
+                where problem_group_id = any($1)
+                group by problem_group_id
+                order by problem_group_id
+                """, connection, transaction))
+            {
+                stats.Parameters.AddWithValue(affectedGroups.ToArray());
+                stats.Parameters.AddWithValue(policy.EscalationCutoff(timeProvider.GetUtcNow()));
+                await using var reader = await stats.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    statsByGroup[reader.GetGuid(0)] = new GroupStats(
+                        reader.GetInt32(1),
+                        reader.GetFieldValue<DateTimeOffset>(2),
+                        reader.GetFieldValue<DateTimeOffset>(3),
+                        reader.GetBoolean(4),
+                        reader.GetInt32(5));
+                }
+            }
+
+            await using var updates = new NpgsqlBatch(connection, transaction);
+            foreach (var groupId in affectedGroups)
+            {
+                if (!statsByGroup.TryGetValue(groupId, out var stats)) continue;
+                var lifecycle = policy.ClassifyAfterRetention(
+                    stats.Active,
+                    stats.Count,
+                    stats.RecentCount);
+                var update = new NpgsqlBatchCommand("""
+                    update problem_groups set
+                        lifecycle_state = $2, occurrence_count = $3, first_seen = $4, last_seen = $5,
+                        resolved_at = case when $2 = 'resolved' then coalesce(resolved_at, now()) else null end,
+                        updated_at = now()
+                    where id = $1
+                    """);
+                update.Parameters.AddWithValue(groupId);
+                update.Parameters.AddWithValue(lifecycle.ToString().ToLowerInvariant());
+                update.Parameters.AddWithValue(stats.Count);
+                update.Parameters.AddWithValue(stats.FirstSeen);
+                update.Parameters.AddWithValue(stats.LastSeen);
+                updates.BatchCommands.Add(update);
+            }
+            if (updates.BatchCommands.Count > 0)
+            {
+                await updates.ExecuteNonQueryAsync(cancellationToken);
+            }
+        }
+
         await using var groups = new NpgsqlCommand("delete from problem_groups g where not exists (select 1 from problem_occurrences o where o.problem_group_id = g.id)", connection, transaction);
         deleted += await groups.ExecuteNonQueryAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -225,6 +280,8 @@ public sealed class ProblemRepository(
 
     private async Task<IReadOnlyList<ProblemCandidate>> ReadCandidatesAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, IncidentFingerprint fingerprint, CancellationToken ct)
     {
+        // The incident advisory lock serializes assignment lookups. Avoid locking the occurrence
+        // here so every mutation path acquires its problem-group row before an occurrence row.
         await using var command = new NpgsqlCommand("""
             select id, problem_key, representative_exact_hash, family_hash, representative_features::text,
                    lifecycle_state, occurrence_count, first_seen, last_seen
@@ -281,7 +338,7 @@ public sealed class ProblemRepository(
     {
         await using var command = new NpgsqlCommand("""
             select problem_group_id from problem_occurrences
-            where incident_id = $1 and algorithm_version = $2 for update
+            where incident_id = $1 and algorithm_version = $2
             """, connection, transaction);
         command.Parameters.AddWithValue(incidentId);
         command.Parameters.AddWithValue(algorithmVersion);
@@ -330,6 +387,5 @@ public sealed class ProblemRepository(
         return new GroupStats(reader.GetInt32(0), reader.GetFieldValue<DateTimeOffset>(1),
             reader.GetFieldValue<DateTimeOffset>(2), reader.GetBoolean(3), reader.GetInt32(4));
     }
-
     private sealed record GroupStats(int Count, DateTimeOffset FirstSeen, DateTimeOffset LastSeen, bool Active, int RecentCount);
 }

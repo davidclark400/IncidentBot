@@ -264,7 +264,7 @@ public sealed class KafkaEvidenceConnectorTests
         int maxItems = 50,
         int maxBytes = 262144) => new(
         new StubHttpClientFactory(handler),
-        new KafkaMetricPackStore(catalog),
+        new KafkaMetricPlanStore(catalog),
         TestConfiguration.EvidenceSources(kafka: new IncidentBot.Api.Options.ConnectorTransport
         {
             Mode = "api",

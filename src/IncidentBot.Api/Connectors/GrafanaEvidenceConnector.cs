@@ -39,7 +39,7 @@ public sealed class GrafanaEvidenceConnector(
             var client = httpClientFactory.CreateClient();
             var fromMilliseconds = scope.Start.ToUnixTimeMilliseconds();
             var toMilliseconds = scope.End.ToUnixTimeMilliseconds();
-            var budget = new ConnectorByteBudget(
+            var budget = new ConnectorResponseBudget(
                 scope.MaxBytes,
                 transport.MaxBytes,
                 1 + configuration.Queries.Count);
@@ -61,23 +61,25 @@ public sealed class GrafanaEvidenceConnector(
             annotationParameters.AddRange(configuration.AnnotationTags.Select(tag => $"tags={Uri.EscapeDataString(tag)}"));
             var annotationsUrl = ConnectorUtilities.Url(transport, $"api/annotations?{string.Join('&', annotationParameters)}");
             const string annotationOperation = "GET /api/annotations";
-            var annotationAllowance = budget.BeginOperation(annotationOperation);
-            if (annotationAllowance > 0)
-            {
-                try
+            var annotationJson = await budget.TryReadJsonAsync(
+                annotationOperation,
+                async operationCancellationToken =>
                 {
                     using var annotationRequest = ConnectorUtilities.CreateRequest(
                         HttpMethod.Get, annotationsUrl, transport, credentials);
                     annotationRequest.Headers.TryAddWithoutValidation(
                         "X-Grafana-Org-Id", configuration.OrganizationId.ToString());
-                    using var response = await client.SendAsync(
-                        annotationRequest, HttpCompletionOption.ResponseHeadersRead, ct);
-                    using var json = await ConnectorUtilities.ReadBoundedJsonAsync(
-                        response,
-                        budget.SafeReadLimit(annotationAllowance, response.Content),
-                        ct,
-                        budget.ObserveBytesRead);
-                    foreach (var annotation in json.RootElement.EnumerateArray())
+                    return await client.SendAsync(
+                        annotationRequest,
+                        HttpCompletionOption.ResponseHeadersRead,
+                        operationCancellationToken);
+                },
+                ct);
+            if (annotationJson is not null)
+            {
+                using (annotationJson)
+                {
+                    foreach (var annotation in annotationJson.RootElement.EnumerateArray())
                     {
                         var at = ConnectorUtilities.Timestamp(annotation, "time", scope.End);
                         var text = ConnectorUtilities.Text(annotation, "text", "Grafana annotation");
@@ -88,10 +90,6 @@ public sealed class GrafanaEvidenceConnector(
                             ConnectorUtilities.Provenance("GET /api/annotations", new { configuration.AnnotationTags })));
                         timeline.Add(new TimelineCandidate(at, Source, "annotation", text, "info", url));
                     }
-                }
-                catch (InvalidOperationException exception) when (ConnectorUtilities.IsByteLimitException(exception))
-                {
-                    budget.RecordLimited(annotationOperation);
                 }
             }
 
@@ -118,19 +116,24 @@ public sealed class GrafanaEvidenceConnector(
                 };
                 var queryUrl = ConnectorUtilities.Url(transport, "api/ds/query");
                 var operation = $"POST /api/ds/query ({query.Name})";
-                var allowance = budget.BeginOperation(operation);
-                if (allowance <= 0) continue;
-                try
+                var json = await budget.TryReadJsonAsync(
+                    operation,
+                    async operationCancellationToken =>
+                    {
+                        using var request = ConnectorUtilities.CreateRequest(
+                            HttpMethod.Post, queryUrl, transport, credentials);
+                        request.Headers.TryAddWithoutValidation(
+                            "X-Grafana-Org-Id", configuration.OrganizationId.ToString());
+                        request.Content = JsonContent.Create(queryBody);
+                        return await client.SendAsync(
+                            request,
+                            HttpCompletionOption.ResponseHeadersRead,
+                            operationCancellationToken);
+                    },
+                    ct);
+                if (json is null) continue;
+                using (json)
                 {
-                    using var request = ConnectorUtilities.CreateRequest(HttpMethod.Post, queryUrl, transport, credentials);
-                    request.Headers.TryAddWithoutValidation("X-Grafana-Org-Id", configuration.OrganizationId.ToString());
-                    request.Content = JsonContent.Create(queryBody);
-                    using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-                    using var json = await ConnectorUtilities.ReadBoundedJsonAsync(
-                        response,
-                        budget.SafeReadLimit(allowance, response.Content),
-                        ct,
-                        budget.ObserveBytesRead);
                     var values = MetricValues(json.RootElement).Take(10000).ToList();
                     var max = values.Count == 0 ? (double?)null : values.Max();
                     var warning = max.HasValue && query.WarningAbove.HasValue && max.Value > query.WarningAbove.Value;
@@ -158,10 +161,6 @@ public sealed class GrafanaEvidenceConnector(
                         }),
                         ObjectType: "metric-query",
                         ObjectId: $"{query.DatasourceUid}:{query.Name}"));
-                }
-                catch (InvalidOperationException exception) when (ConnectorUtilities.IsByteLimitException(exception))
-                {
-                    budget.RecordLimited(operation);
                 }
             }
 

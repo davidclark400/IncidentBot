@@ -52,7 +52,7 @@ public sealed class NomadEvidenceConnector(
                 }))
                 .Take(candidateLimit)
                 .ToList();
-            var budget = new ConnectorByteBudget(
+            var budget = new ConnectorResponseBudget(
                 scope.MaxBytes,
                 transport.MaxBytes,
                 jobs.Count * 4);
@@ -64,20 +64,22 @@ public sealed class NomadEvidenceConnector(
             foreach (var job in jobs)
             {
                 var operation = $"GET /v1/job/{{id}} ({job.Namespace}/{job.Name})";
-                var allowance = budget.BeginOperation(operation);
-                if (allowance <= 0) continue;
-                try
+                var jobJson = await budget.TryReadJsonAsync(
+                    operation,
+                    async operationCancellationToken =>
+                    {
+                        using var jobRequest = ConnectorUtilities.CreateRequest(
+                            HttpMethod.Get, job.Url, transport, credentials);
+                        SetNomadToken(jobRequest, transport, credentials);
+                        return await client.SendAsync(
+                            jobRequest,
+                            HttpCompletionOption.ResponseHeadersRead,
+                            operationCancellationToken);
+                    },
+                    ct);
+                if (jobJson is null) continue;
+                using (jobJson)
                 {
-                    using var jobRequest = ConnectorUtilities.CreateRequest(
-                        HttpMethod.Get, job.Url, transport, credentials);
-                    SetNomadToken(jobRequest, transport, credentials);
-                    using var jobResponse = await client.SendAsync(
-                        jobRequest, HttpCompletionOption.ResponseHeadersRead, ct);
-                    using var jobJson = await ConnectorUtilities.ReadBoundedJsonAsync(
-                        jobResponse,
-                        budget.SafeReadLimit(allowance, jobResponse.Content),
-                        ct,
-                        budget.ObserveBytesRead);
                     var status = ConnectorUtilities.Text(jobJson.RootElement, "Status");
                     var modifyTime = ConnectorUtilities.Timestamp(jobJson.RootElement, "SubmitTime", scope.End);
                     var summary = $"Nomad job {job.Namespace}/{job.Name} is {status}";
@@ -95,10 +97,6 @@ public sealed class NomadEvidenceConnector(
                     timeline.Add(new TimelineCandidate(modifyTime, Source, "job-state", summary, severity, job.Url));
                     links.Add(new SourceLink($"Nomad {job.Namespace}/{job.Name}", job.Url));
                 }
-                catch (InvalidOperationException exception) when (ConnectorUtilities.IsByteLimitException(exception))
-                {
-                    budget.RecordLimited(operation);
-                }
             }
 
             foreach (var job in jobs)
@@ -107,20 +105,22 @@ public sealed class NomadEvidenceConnector(
                     transport,
                     $"v1/job/{job.EncodedName}/allocations?{job.Query}&all=true");
                 var operation = $"GET /v1/job/{{id}}/allocations ({job.Namespace}/{job.Name})";
-                var allowance = budget.BeginOperation(operation);
-                if (allowance <= 0) continue;
-                try
+                var allocationJson = await budget.TryReadJsonAsync(
+                    operation,
+                    async operationCancellationToken =>
+                    {
+                        using var allocationRequest = ConnectorUtilities.CreateRequest(
+                            HttpMethod.Get, allocationsUrl, transport, credentials);
+                        SetNomadToken(allocationRequest, transport, credentials);
+                        return await client.SendAsync(
+                            allocationRequest,
+                            HttpCompletionOption.ResponseHeadersRead,
+                            operationCancellationToken);
+                    },
+                    ct);
+                if (allocationJson is null) continue;
+                using (allocationJson)
                 {
-                    using var allocationRequest = ConnectorUtilities.CreateRequest(
-                        HttpMethod.Get, allocationsUrl, transport, credentials);
-                    SetNomadToken(allocationRequest, transport, credentials);
-                    using var allocationResponse = await client.SendAsync(
-                        allocationRequest, HttpCompletionOption.ResponseHeadersRead, ct);
-                    using var allocationJson = await ConnectorUtilities.ReadBoundedJsonAsync(
-                        allocationResponse,
-                        budget.SafeReadLimit(allowance, allocationResponse.Content),
-                        ct,
-                        budget.ObserveBytesRead);
                     foreach (var allocation in allocationJson.RootElement.EnumerateArray().Take(transport.MaxItems))
                     {
                         var clientStatus = ConnectorUtilities.Text(allocation, "ClientStatus");
@@ -141,10 +141,6 @@ public sealed class NomadEvidenceConnector(
                         timeline.Add(new TimelineCandidate(at, Source, "allocation-state", allocationSummary, "warning", allocationsUrl));
                     }
                 }
-                catch (InvalidOperationException exception) when (ConnectorUtilities.IsByteLimitException(exception))
-                {
-                    budget.RecordLimited(operation);
-                }
             }
 
             foreach (var operationName in new[] { "deployments", "evaluations" })
@@ -154,19 +150,22 @@ public sealed class NomadEvidenceConnector(
                     var operationUrl = ConnectorUtilities.Url(transport,
                         $"v1/job/{job.EncodedName}/{operationName}?{job.Query}");
                     var operation = $"GET /v1/job/{{id}}/{operationName} ({job.Namespace}/{job.Name})";
-                    var allowance = budget.BeginOperation(operation);
-                    if (allowance <= 0) continue;
-                    try
+                    var operationJson = await budget.TryReadJsonAsync(
+                        operation,
+                        async operationCancellationToken =>
+                        {
+                            using var operationRequest = ConnectorUtilities.CreateRequest(
+                                HttpMethod.Get, operationUrl, transport, credentials);
+                            SetNomadToken(operationRequest, transport, credentials);
+                            return await client.SendAsync(
+                                operationRequest,
+                                HttpCompletionOption.ResponseHeadersRead,
+                                operationCancellationToken);
+                        },
+                        ct);
+                    if (operationJson is null) continue;
+                    using (operationJson)
                     {
-                        using var operationRequest = ConnectorUtilities.CreateRequest(HttpMethod.Get, operationUrl, transport, credentials);
-                        SetNomadToken(operationRequest, transport, credentials);
-                        using var operationResponse = await client.SendAsync(
-                            operationRequest, HttpCompletionOption.ResponseHeadersRead, ct);
-                        using var operationJson = await ConnectorUtilities.ReadBoundedJsonAsync(
-                            operationResponse,
-                            budget.SafeReadLimit(allowance, operationResponse.Content),
-                            ct,
-                            budget.ObserveBytesRead);
                         foreach (var item in operationJson.RootElement.EnumerateArray().Take(transport.MaxItems))
                         {
                             var itemId = ConnectorUtilities.Text(item, "ID");
@@ -189,10 +188,6 @@ public sealed class NomadEvidenceConnector(
                             timeline.Add(new TimelineCandidate(at, Source, kind, itemSummary,
                                 healthy ? "info" : "warning", operationUrl));
                         }
-                    }
-                    catch (InvalidOperationException exception) when (ConnectorUtilities.IsByteLimitException(exception))
-                    {
-                        budget.RecordLimited(operation);
                     }
                 }
             }

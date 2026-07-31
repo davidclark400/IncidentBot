@@ -41,7 +41,7 @@ public sealed class InvestigationRunner(
     AdaptiveEvidenceCollector evidenceCollector,
     ReportComposer composer,
     IInvestigationSynthesizer synthesizer,
-    IIncidentUpdatePublisher updates,
+    InvestigationReportTransitions transitions,
     IOptions<IncidentBotOptions> options,
     TimeProvider timeProvider,
     IRecurrenceCoordinator recurrence,
@@ -71,11 +71,11 @@ public sealed class InvestigationRunner(
         if (incident.Version == 0)
         {
             var initial = composer.ComposeInitial(incident, profile, profiles.Revision, provisionalContext);
-            var initialVersion = await repository.SaveReportAsync(incident, initial, cancellationToken);
-            await updates.PublishReportAsync(
-                incident.Id, initialVersion, initial.Status, ["status", "timeline", "sources", "problem"], cancellationToken);
-            incident = await repository.GetIncidentAsync(incidentId, cancellationToken)
-                ?? throw new InvalidOperationException($"Incident '{incidentId}' disappeared after initial report.");
+            incident = await transitions.CommitAsync(
+                incident,
+                initial,
+                InvestigationReportTransition.Initial,
+                cancellationToken);
             createdInitialReport = true;
         }
 
@@ -91,9 +91,11 @@ public sealed class InvestigationRunner(
                     UpdatedAt = timeProvider.GetUtcNow(),
                     Problem = provisionalContext
                 };
-                var disabledVersion = await repository.SaveReportAsync(incident, updated, cancellationToken);
-                await updates.PublishReportAsync(
-                    incident.Id, disabledVersion, updated.Status, ["status", "problem"], cancellationToken);
+                await transitions.CommitAsync(
+                    incident,
+                    updated,
+                    InvestigationReportTransition.CollectionDisabled,
+                    cancellationToken);
             }
             logger.LogInformation(
                 "Investigation completed without evidence collection in {DurationMilliseconds} ms",
@@ -101,9 +103,10 @@ public sealed class InvestigationRunner(
             return;
         }
 
-        await repository.SetStatusAsync(incident.Id, IncidentProgression.Collecting, cancellationToken);
-        await updates.PublishStatusAsync(
-            incident.Id, incident.Version, IncidentProgression.Collecting, cancellationToken);
+        incident = await transitions.SetStatusAsync(
+            incident,
+            IncidentProgression.Collecting,
+            cancellationToken);
 
         var context = new InvestigationContext(
             incident.Id, incident.PagerDutyIncidentId, incident.ServiceId, incident.Title, incident.Urgency,
@@ -115,15 +118,11 @@ public sealed class InvestigationRunner(
             var previousReport = await repository.GetReportAsync(incident.Id, cancellationToken);
             var requested = composer.ComposeCollectionStarted(
                 incident, profile, profiles.Revision, previousReport, provisionalContext);
-            var requestedVersion = await repository.SaveReportAsync(incident, requested, cancellationToken);
-            await updates.PublishReportAsync(
-                incident.Id,
-                requestedVersion,
-                requested.Status,
-                ["status", "sources", "problem"],
+            incident = await transitions.CommitAsync(
+                incident,
+                requested,
+                InvestigationReportTransition.CollectionStarted,
                 cancellationToken);
-            incident = await repository.GetIncidentAsync(incidentId, cancellationToken)
-                ?? throw new InvalidOperationException($"Incident '{incidentId}' disappeared after source requests started.");
         }
         if (selectedConnectors.Count == 0)
         {
@@ -162,14 +161,15 @@ public sealed class InvestigationRunner(
         {
             Problem = await recurrence.ResolveFinalAsync(incident, report.Evidence, cancellationToken)
         };
-        var version = await repository.SaveReportAsync(incident, report, cancellationToken);
-        await updates.PublishReportAsync(
-            incident.Id, version, report.Status,
-            ["summary", "ai", "timeline", "evidence", "sources", "links", "problem"], cancellationToken);
+        incident = await transitions.CommitAsync(
+            incident,
+            report,
+            InvestigationReportTransition.Completed,
+            cancellationToken);
         logger.LogInformation(
             "Investigation completed in {DurationMilliseconds} ms with report version {ReportVersion}, status {ReportStatus}, synthesis status {SynthesisStatus}, and evidence completion reason {EvidenceCompletionReason}",
             investigationStopwatch.ElapsedMilliseconds,
-            version,
+            incident.Version,
             report.Status,
             ai.Status,
             collection.Outcome.CompletionReason);

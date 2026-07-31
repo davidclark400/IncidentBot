@@ -1,6 +1,5 @@
 using System.Text.Json;
 using IncidentBot.Api.Domain;
-using IncidentBot.Api.Profiles;
 using IncidentBot.Api.Security;
 using IncidentBot.Api.Options;
 using Microsoft.Extensions.Options;
@@ -20,8 +19,7 @@ public static class PagerDutyWebhookEndpoints
         HttpRequest request,
         PagerDutySignatureValidator validator,
         IOptions<PagerDutyOptions> pagerDutyOptions,
-        InvestigationProfileStore profiles,
-        IIncidentStore repository,
+        IIncidentIntake intake,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -60,9 +58,7 @@ public static class PagerDutyWebhookEndpoints
             return Results.BadRequest(new { error = exception.Message });
         }
 
-        var profile = profiles.Resolve(webhook.ServiceId, webhook.Labels);
-        webhook = webhook with { Labels = profiles.FilterPersistedLabels(profile, webhook.Labels) };
-        var accepted = await repository.AcceptWebhookAsync(webhook, profile, payload, cancellationToken);
+        var accepted = await intake.AcceptAsync(webhook, payload, cancellationToken);
         logger.LogInformation(
             "PagerDuty webhook {WebhookEventId} accepted for incident {IncidentId} and service {ServiceId}; duplicate: {IsDuplicate}",
             webhook.EventId, accepted.IncidentId, webhook.ServiceId, accepted.IsDuplicate);

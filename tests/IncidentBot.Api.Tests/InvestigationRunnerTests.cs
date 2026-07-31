@@ -31,7 +31,7 @@ public sealed class InvestigationRunnerTests
             Collector(botOptions),
             new ReportComposer(TimeProvider.System, evidenceSources),
             new Synthesizer(),
-            updates,
+            new InvestigationReportTransitions(repository, updates),
             botOptions,
             TimeProvider.System,
             new Recurrence(),
@@ -99,7 +99,8 @@ public sealed class InvestigationRunnerTests
         var botOptions = BotOptions(collectionEnabled: false);
         var runner = new InvestigationRunner(
             repository, profileProvider, evidenceSources, Collector(botOptions),
-            new ReportComposer(TimeProvider.System, evidenceSources), new Synthesizer(), updates, botOptions,
+            new ReportComposer(TimeProvider.System, evidenceSources), new Synthesizer(),
+            new InvestigationReportTransitions(repository, updates), botOptions,
             TimeProvider.System, new Recurrence(), NullLogger<InvestigationRunner>.Instance);
 
         await runner.RunAsync(incident.Id, CancellationToken.None);
@@ -158,7 +159,7 @@ public sealed class InvestigationRunnerTests
         return new InvestigationRunner(
             repository, new ProfileProvider(connectorList.Select(item => item.Source)), evidenceSources,
             Collector(botOptions), new ReportComposer(TimeProvider.System, evidenceSources),
-            synthesizer, new RecordingUpdates(), botOptions,
+            synthesizer, new InvestigationReportTransitions(repository, new RecordingUpdates()), botOptions,
             TimeProvider.System, recurrence ?? new Recurrence(), NullLogger<InvestigationRunner>.Instance);
     }
 
@@ -177,12 +178,14 @@ public sealed class InvestigationRunnerTests
 
     private sealed class RecordingRepository(IncidentRecord incident, InvestigationReport? previousReport = null) : IIncidentStore
     {
+        private IncidentRecord currentIncident = incident;
+
         public List<string> Statuses { get; } = [];
         public List<InvestigationReport> SavedReports { get; } = [];
         public InvestigationReport? SavedReport => SavedReports.LastOrDefault();
 
         public Task<IncidentRecord?> GetIncidentAsync(Guid incidentId, CancellationToken cancellationToken) =>
-            Task.FromResult<IncidentRecord?>(incident);
+            Task.FromResult<IncidentRecord?>(currentIncident);
 
         public Task<InvestigationReport?> GetReportAsync(Guid incidentId, CancellationToken cancellationToken) =>
             Task.FromResult(SavedReport ?? previousReport);
@@ -192,13 +195,22 @@ public sealed class InvestigationRunnerTests
             InvestigationReport report,
             CancellationToken cancellationToken)
         {
+            Assert.Equal(currentIncident.Version, current.Version);
             SavedReports.Add(report);
-            return Task.FromResult(current.Version + 1);
+            var version = current.Version + 1;
+            currentIncident = currentIncident with
+            {
+                Version = version,
+                Status = report.Status,
+                UpdatedAt = report.UpdatedAt
+            };
+            return Task.FromResult(version);
         }
 
         public Task SetStatusAsync(Guid incidentId, string status, CancellationToken cancellationToken)
         {
             Statuses.Add(status);
+            currentIncident = currentIncident with { Status = status };
             return Task.CompletedTask;
         }
 
@@ -212,7 +224,7 @@ public sealed class InvestigationRunnerTests
             PagerDutyWebhookEvent webhook,
             InvestigationProfile profile,
             ReadOnlyMemory<byte> rawPayload,
-            CancellationToken cancellationToken) => Task.FromResult((incident.Id, false));
+            CancellationToken cancellationToken) => Task.FromResult((currentIncident.Id, false));
 
         public Task SetSlackTimestampAsync(Guid incidentId, string timestamp, CancellationToken cancellationToken) =>
             Task.CompletedTask;

@@ -1,4 +1,3 @@
-using IncidentBot.Api.Incidents;
 using IncidentBot.Contracts;
 using Microsoft.AspNetCore.Http.HttpResults;
 
@@ -17,17 +16,10 @@ public static class DemoIncidentApi
     }
 
     private static async Task<Ok<DemoReset>> ResetAsync(
-        DemoIncidentStore store,
-        IIncidentUpdatePublisher updates,
+        DemoReplay replay,
         CancellationToken cancellationToken)
     {
-        var reset = store.Reset();
-        await updates.PublishReportAsync(
-            DemoIncidentStore.IncidentId,
-            reset.Report.Version,
-            reset.Report.Status,
-            ["status", "summary", "timeline", "evidence", "sources", "causalEvents", "ai", "problem"],
-            cancellationToken);
+        var reset = await replay.ResetAsync(cancellationToken);
         return TypedResults.Ok(new DemoReset(
             DemoIncidentStore.IncidentId,
             $"/incidents/{DemoIncidentStore.IncidentId}",

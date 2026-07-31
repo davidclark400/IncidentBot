@@ -17,7 +17,7 @@ namespace IncidentBot.Api.Connectors;
 /// </summary>
 public sealed class KafkaEvidenceConnector(
     IHttpClientFactory httpClientFactory,
-    KafkaMetricPackStore metricPacks,
+    KafkaMetricPlanStore metricPlans,
     EvidenceSourceConfiguration evidenceSources,
     ICredentialProvider credentials) : IIncidentEvidenceConnector
 {
@@ -62,21 +62,16 @@ public sealed class KafkaEvidenceConnector(
         ConnectorTransport transport,
         CancellationToken cancellationToken)
     {
-        metricPacks.ValidateProfile(configuration);
-        var pack = metricPacks.GetPack(configuration.MetricPackId);
-        var orderedMetrics = pack.Metrics
-            .OrderBy(metric => metric.Id, StringComparer.Ordinal)
-            .ToArray();
-        var batches = orderedMetrics
+        var plan = metricPlans.Resolve(configuration);
+        var batches = plan.Metrics
             .Chunk(MaximumTargetsPerBatch)
             .Select(batch => batch
-                .Select((metric, index) => new PlannedMetric(
+                .Select((metric, index) => new BatchMetric(
                     metric,
                     ((char)('A' + index)).ToString(CultureInfo.InvariantCulture)))
                 .ToArray())
             .ToArray();
-        var planned = batches.SelectMany(batch => batch).ToArray();
-        var budget = new ConnectorByteBudget(scope.MaxBytes, transport.MaxBytes, batches.Length);
+        var budget = new ConnectorResponseBudget(scope.MaxBytes, transport.MaxBytes, batches.Length);
         var series = new Dictionary<SeriesKey, MetricSeries>();
         var diagnostics = new List<string>();
         var partial = false;
@@ -89,20 +84,13 @@ public sealed class KafkaEvidenceConnector(
         {
             var batch = batches[batchIndex];
             var operation = $"POST /api/ds/query (Kafka batch {batchIndex + 1}/{batches.Length})";
-            var allowance = budget.BeginOperation(operation);
-            if (allowance <= 0)
-            {
-                partial = true;
-                continue;
-            }
-
             try
             {
                 var targets = batch.Select(item => new
                 {
                     refId = item.RefId,
                     datasource = new { uid = item.Metric.DatasourceUid },
-                    expr = KafkaPromQlRenderer.Render(item.Metric.PromQl, configuration),
+                    expr = item.Metric.RuntimePromQl,
                     format = "time_series",
                     intervalMs = QueryIntervalMilliseconds(scope),
                     maxDataPoints = 240
@@ -114,41 +102,44 @@ public sealed class KafkaEvidenceConnector(
                     queries = targets
                 };
 
-                using var request = ConnectorUtilities.CreateRequest(
-                    HttpMethod.Post,
-                    queryUrl,
-                    transport,
-                    credentials);
-                request.Content = JsonContent.Create(body);
-                using var response = await client.SendAsync(
-                    request,
-                    HttpCompletionOption.ResponseHeadersRead,
+                var json = await budget.TryReadJsonAsync(
+                    operation,
+                    async operationCancellationToken =>
+                    {
+                        using var request = ConnectorUtilities.CreateRequest(
+                            HttpMethod.Post,
+                            queryUrl,
+                            transport,
+                            credentials);
+                        request.Content = JsonContent.Create(body);
+                        return await client.SendAsync(
+                            request,
+                            HttpCompletionOption.ResponseHeadersRead,
+                            operationCancellationToken);
+                    },
                     cancellationToken);
-                using var json = await ConnectorUtilities.ReadBoundedJsonAsync(
-                    response,
-                    budget.SafeReadLimit(allowance, response.Content),
-                    cancellationToken,
-                    budget.ObserveBytesRead);
-                successfulBatches++;
-                if (!ParseBatch(
-                        json.RootElement,
-                        batch,
-                        configuration,
-                        series,
-                        diagnostics))
+                if (json is null)
                 {
                     partial = true;
+                    continue;
+                }
+                using (json)
+                {
+                    successfulBatches++;
+                    if (!ParseBatch(
+                        json.RootElement,
+                        batch,
+                        plan,
+                        series,
+                        diagnostics))
+                    {
+                        partial = true;
+                    }
                 }
             }
             catch (OperationCanceledException)
             {
                 throw;
-            }
-            catch (InvalidOperationException exception)
-                when (ConnectorUtilities.IsByteLimitException(exception))
-            {
-                budget.RecordLimited(operation);
-                partial = true;
             }
             catch (Exception exception)
             {
@@ -190,25 +181,23 @@ public sealed class KafkaEvidenceConnector(
                 continue;
             }
 
-            configuration.ThresholdOverrides.TryGetValue(item.Metric.Id, out var thresholdOverride);
-            var thresholds = metricPacks.EffectiveThresholds(item.Metric, thresholdOverride);
             var severity = item.Metric.EvidenceMode == "context"
                 ? "info"
-                : thresholds.State(reducedValue);
+                : item.Metric.Thresholds.State(reducedValue);
             if (item.Metric.EvidenceMode == "anomaly" && severity == "info")
             {
                 continue;
             }
 
             var objectType = ObjectType(item.Metric.ResourceScope);
-            var objectId = ObjectId(item.Metric, configuration, item.Labels);
+            var objectId = ObjectId(item.Metric, plan, item.Labels);
             var summary = Summary(item.Metric, reducedValue, severity, objectId);
             var finding = new EvidenceFinding(
                 ConnectorUtilities.Id(
                     Source,
                     "metric",
                     context.Profile.Id,
-                    pack.Id,
+                    plan.MetricPackId,
                     item.Metric.Id,
                     item.FieldName,
                     item.LabelIdentity),
@@ -223,7 +212,7 @@ public sealed class KafkaEvidenceConnector(
                 severity == "critical" ? 0.95 : severity == "warning" ? 0.9 : 0.75,
                 ConnectorUtilities.Provenance("POST /api/ds/query", new
                 {
-                    metricPackId = pack.Id,
+                    metricPackId = plan.MetricPackId,
                     metricId = item.Metric.Id,
                     metricTitle = item.Metric.Title,
                     datasourceUid = item.Metric.DatasourceUid,
@@ -232,13 +221,13 @@ public sealed class KafkaEvidenceConnector(
                     timeReducer = item.Metric.TimeReducer,
                     evidenceMode = item.Metric.EvidenceMode,
                     requirement = item.Metric.Requirement,
-                    cluster = configuration.Cluster,
+                    cluster = plan.Cluster,
                     returnedLabels = item.Labels,
                     reducedValue,
                     thresholdState = severity,
-                    warningThreshold = thresholds.Warning,
-                    criticalThreshold = thresholds.Critical,
-                    direction = thresholds.Direction,
+                    warningThreshold = item.Metric.Thresholds.Warning,
+                    criticalThreshold = item.Metric.Thresholds.Critical,
+                    direction = item.Metric.Thresholds.Direction,
                     timestampSupported,
                     exactWindowStart = scope.Start,
                     exactWindowEnd = scope.End
@@ -265,7 +254,7 @@ public sealed class KafkaEvidenceConnector(
         var returnedMetricIds = series.Values
             .Select(item => item.Metric.Id)
             .ToHashSet(StringComparer.Ordinal);
-        foreach (var metric in planned.Select(item => item.Metric)
+        foreach (var metric in plan.Metrics
                      .Where(metric => metric.IsRequired && !returnedMetricIds.Contains(metric.Id)))
         {
             partial = true;
@@ -304,8 +293,8 @@ public sealed class KafkaEvidenceConnector(
 
     private static bool ParseBatch(
         JsonElement root,
-        IReadOnlyList<PlannedMetric> batch,
-        KafkaProfileScope configuration,
+        IReadOnlyList<BatchMetric> batch,
+        KafkaMetricPlan plan,
         IDictionary<SeriesKey, MetricSeries> output,
         ICollection<string> diagnostics)
     {
@@ -370,7 +359,7 @@ public sealed class KafkaEvidenceConnector(
                     if (!LabelsAreInScope(
                             allLabels,
                             planned.Metric,
-                            configuration,
+                            plan,
                             out var scopeFailure))
                     {
                         complete = false;
@@ -498,7 +487,7 @@ public sealed class KafkaEvidenceConnector(
 
     private static IReadOnlyDictionary<string, string> BoundLabels(
         IReadOnlyDictionary<string, string> labels,
-        KafkaMetricDefinition metric)
+        KafkaPlannedMetric metric)
     {
         var bounded = new SortedDictionary<string, string>(StringComparer.Ordinal);
         foreach (var label in labels
@@ -513,34 +502,31 @@ public sealed class KafkaEvidenceConnector(
         return bounded;
     }
 
-    private static bool IsScopeLabelName(string name, KafkaMetricDefinition metric) =>
-        KafkaPromQlRenderer.ScopeLabelKeys(metric.PromQl)
-            .Values
-            .Any(names => names.Contains(name));
+    private static bool IsScopeLabelName(string name, KafkaPlannedMetric metric) =>
+        metric.ExpectedScopeLabels.Contains(name);
 
     private static bool LabelsAreInScope(
         IReadOnlyDictionary<string, string> labels,
-        KafkaMetricDefinition metric,
-        KafkaProfileScope scope,
+        KafkaPlannedMetric metric,
+        KafkaMetricPlan plan,
         out string failure)
     {
-        var scopedLabels = KafkaPromQlRenderer.ScopeLabelKeys(metric.PromQl);
         foreach (var label in labels)
         {
-            if (scopedLabels["clusterRegex"].Contains(label.Key)
-                && !string.Equals(label.Value, scope.Cluster, StringComparison.Ordinal))
+            if (metric.ExpectedScopeLabels.Cluster.Contains(label.Key)
+                && !string.Equals(label.Value, plan.Cluster, StringComparison.Ordinal))
             {
                 failure = "cluster label is not allowlisted";
                 return false;
             }
-            if (scopedLabels["topicRegex"].Contains(label.Key)
-                && !scope.Topics.Contains(label.Value, StringComparer.Ordinal))
+            if (metric.ExpectedScopeLabels.Topic.Contains(label.Key)
+                && !plan.Topics.Contains(label.Value, StringComparer.Ordinal))
             {
                 failure = "topic label is not allowlisted";
                 return false;
             }
-            if (scopedLabels["consumerGroupRegex"].Contains(label.Key)
-                && !scope.ConsumerGroups.Contains(label.Value, StringComparer.Ordinal))
+            if (metric.ExpectedScopeLabels.ConsumerGroup.Contains(label.Key)
+                && !plan.ConsumerGroups.Contains(label.Value, StringComparer.Ordinal))
             {
                 failure = "consumer-group label is not allowlisted";
                 return false;
@@ -690,25 +676,24 @@ public sealed class KafkaEvidenceConnector(
     };
 
     private static string ObjectId(
-        KafkaMetricDefinition metric,
-        KafkaProfileScope scope,
+        KafkaPlannedMetric metric,
+        KafkaMetricPlan plan,
         IReadOnlyDictionary<string, string> labels)
     {
-        var scopedLabels = KafkaPromQlRenderer.ScopeLabelKeys(metric.PromQl);
-        var cluster = LabelValue(labels, scopedLabels["clusterRegex"]) ?? scope.Cluster;
+        var cluster = LabelValue(labels, metric.ExpectedScopeLabels.Cluster) ?? plan.Cluster;
         if (metric.ResourceScope == "topic")
         {
-            var topic = LabelValue(labels, scopedLabels["topicRegex"])
-                ?? (scope.Topics.Count == 1 ? scope.Topics[0] : "allowlisted-topics");
+            var topic = LabelValue(labels, metric.ExpectedScopeLabels.Topic)
+                ?? (plan.Topics.Length == 1 ? plan.Topics[0] : "allowlisted-topics");
             return $"{cluster}/{topic}";
         }
         if (metric.ResourceScope == "consumer-group")
         {
-            var topic = LabelValue(labels, scopedLabels["topicRegex"])
-                ?? (scope.Topics.Count == 1 ? scope.Topics[0] : "allowlisted-topics");
-            var group = LabelValue(labels, scopedLabels["consumerGroupRegex"])
-                ?? (scope.ConsumerGroups.Count == 1
-                    ? scope.ConsumerGroups[0]
+            var topic = LabelValue(labels, metric.ExpectedScopeLabels.Topic)
+                ?? (plan.Topics.Length == 1 ? plan.Topics[0] : "allowlisted-topics");
+            var group = LabelValue(labels, metric.ExpectedScopeLabels.ConsumerGroup)
+                ?? (plan.ConsumerGroups.Length == 1
+                    ? plan.ConsumerGroups[0]
                     : "allowlisted-consumer-groups");
             return $"{cluster}/{topic}/{group}";
         }
@@ -722,7 +707,7 @@ public sealed class KafkaEvidenceConnector(
         .Value;
 
     private static string Summary(
-        KafkaMetricDefinition metric,
+        KafkaPlannedMetric metric,
         double value,
         string severity,
         string objectId)
@@ -739,16 +724,16 @@ public sealed class KafkaEvidenceConnector(
         if (!diagnostics.Contains(bounded, StringComparer.Ordinal)) diagnostics.Add(bounded);
     }
 
-    private sealed record PlannedMetric(KafkaMetricDefinition Metric, string RefId);
+    private sealed record BatchMetric(KafkaPlannedMetric Metric, string RefId);
     private sealed record SeriesKey(string MetricId, string FieldName, string LabelIdentity);
 
     private sealed class MetricSeries(
-        KafkaMetricDefinition metric,
+        KafkaPlannedMetric metric,
         string fieldName,
         IReadOnlyDictionary<string, string> labels,
         string labelIdentity)
     {
-        public KafkaMetricDefinition Metric { get; } = metric;
+        public KafkaPlannedMetric Metric { get; } = metric;
         public string FieldName { get; } = fieldName;
         public IReadOnlyDictionary<string, string> Labels { get; } = labels;
         public string LabelIdentity { get; } = labelIdentity;

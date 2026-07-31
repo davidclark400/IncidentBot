@@ -7,41 +7,133 @@ using IncidentBot.Api.Security;
 
 namespace IncidentBot.Api.Tests;
 
-public sealed class NativeConnectorByteBudgetTests
+public sealed class NativeConnectorResponseBudgetTests
 {
     [Fact]
-    public void BudgetReservesFairSharesAndReusesUnusedCapacity()
+    public async Task BudgetedReadsReserveFairSharesAndReuseUnusedCapacity()
     {
-        var budget = new ConnectorByteBudget(
+        var budget = new ConnectorResponseBudget(
             scopeMaximumBytes: 100,
             connectorMaximumBytes: 200,
             plannedOperations: 3);
 
-        var first = budget.BeginOperation("first");
-        Assert.Equal(33, first);
-        budget.ObserveBytesRead(3);
+        using var first = await budget.TryReadJsonAsync(
+            "first", _ => Task.FromResult(JsonBytes(3)), CancellationToken.None);
+        using var second = await budget.TryReadJsonAsync(
+            "second", _ => Task.FromResult(JsonBytes(49)), CancellationToken.None);
+        using var third = await budget.TryReadJsonAsync(
+            "third", _ => Task.FromResult(JsonBytes(49)), CancellationToken.None);
 
-        var second = budget.BeginOperation("second");
-        Assert.Equal(48, second);
-        budget.ObserveBytesRead(second);
-
-        var third = budget.BeginOperation("third");
-        Assert.Equal(49, third);
-        Assert.Equal(49, budget.RemainingBytes);
-        Assert.Equal(100, budget.MaximumBytes);
+        Assert.NotNull(first);
+        Assert.Null(second);
+        Assert.NotNull(third);
+        Assert.True(budget.IsPartial);
+        Assert.Contains("used 100 of 100 bytes", budget.Diagnostic, StringComparison.Ordinal);
+        Assert.Contains("second", budget.Diagnostic, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void BudgetDiagnosticIsBounded()
+    public async Task SkippedPlannedOperationRedistributesItsShare()
     {
-        var budget = new ConnectorByteBudget(100, 100, 20);
+        var budget = new ConnectorResponseBudget(100, 100, 3);
+        budget.SkipPlannedOperation();
+
+        using var first = await budget.TryReadJsonAsync(
+            "first", _ => Task.FromResult(JsonBytes(50)), CancellationToken.None);
+        using var second = await budget.TryReadJsonAsync(
+            "second", _ => Task.FromResult(JsonBytes(50)), CancellationToken.None);
+
+        Assert.NotNull(first);
+        Assert.NotNull(second);
+        Assert.False(budget.IsPartial);
+        Assert.Null(budget.Diagnostic);
+    }
+
+    [Fact]
+    public async Task BudgetDiagnosticIsBoundedAndDoesNotSendUnfundedOperations()
+    {
+        var budget = new ConnectorResponseBudget(0, 100, 20);
+        var sends = 0;
         for (var index = 0; index < 20; index++)
         {
-            budget.RecordLimited($"operation-{index}-{new string('x', 200)}");
+            using var json = await budget.TryReadJsonAsync(
+                $"operation-{index}-{new string('x', 200)}",
+                _ =>
+                {
+                    sends++;
+                    return Task.FromResult(Json("[]"));
+                },
+                CancellationToken.None);
+            Assert.Null(json);
         }
 
+        Assert.Equal(0, sends);
         Assert.NotNull(budget.Diagnostic);
         Assert.True(budget.Diagnostic.Length <= 500);
+    }
+
+    [Fact]
+    public async Task ChunkedOverflowUsesTheLastSourceByteAsProof()
+    {
+        var budget = new ConnectorResponseBudget(5, 100, 1);
+        await using var stream = new NonSeekableMemoryStream(Encoding.UTF8.GetBytes("[123456789]"));
+
+        using var json = await budget.TryReadJsonAsync(
+            "chunked",
+            _ => Task.FromResult(new HttpResponseMessage
+            {
+                Content = new StreamContent(stream)
+            }),
+            CancellationToken.None);
+
+        Assert.Null(json);
+        Assert.Equal(5, stream.BytesRead);
+        Assert.Contains("used 5 of 5 bytes", budget.Diagnostic, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DeclaredOversizeExhaustsTheShareWithoutReadingTheBody()
+    {
+        var budget = new ConnectorResponseBudget(10, 100, 1);
+        await using var stream = new NonSeekableMemoryStream(new byte[100]);
+
+        using var json = await budget.TryReadJsonAsync(
+            "declared",
+            _ =>
+            {
+                var response = new HttpResponseMessage
+                {
+                    Content = new StreamContent(stream)
+                };
+                response.Content.Headers.ContentLength = 100;
+                return Task.FromResult(response);
+            },
+            CancellationToken.None);
+
+        Assert.Null(json);
+        Assert.Equal(0, stream.BytesRead);
+        Assert.Contains("used 10 of 10 bytes", budget.Diagnostic, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task BudgetedReadForwardsCancellationWithoutMarkingTheBudgetPartial()
+    {
+        var budget = new ConnectorResponseBudget(100, 100, 1);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            budget.TryReadJsonAsync(
+                "cancelled",
+                operationCancellationToken =>
+                {
+                    Assert.Equal(cancellation.Token, operationCancellationToken);
+                    return Task.FromCanceled<HttpResponseMessage>(operationCancellationToken);
+                },
+                cancellation.Token));
+
+        Assert.False(budget.IsPartial);
+        Assert.Null(budget.Diagnostic);
     }
 
     [Fact]
@@ -357,6 +449,9 @@ public sealed class NativeConnectorByteBudgetTests
 
     private static HttpResponseMessage Json(string value) => Text(value, "application/json");
 
+    private static HttpResponseMessage JsonBytes(int byteCount) =>
+        Json($"\"{new string('x', byteCount - 2)}\"");
+
     private static HttpResponseMessage Text(string value, string mediaType) => new(HttpStatusCode.OK)
     {
         Content = new StringContent(value, Encoding.UTF8, mediaType)
@@ -385,5 +480,20 @@ public sealed class NativeConnectorByteBudgetTests
             string? allowedBaseUrl,
             CancellationToken cancellationToken) =>
             throw new InvalidOperationException("MCP should not be called by native connector tests.");
+    }
+
+    private sealed class NonSeekableMemoryStream(byte[] buffer) : MemoryStream(buffer, writable: false)
+    {
+        public int BytesRead { get; private set; }
+        public override bool CanSeek => false;
+
+        public override async ValueTask<int> ReadAsync(
+            Memory<byte> destination,
+            CancellationToken cancellationToken = default)
+        {
+            var count = await base.ReadAsync(destination, cancellationToken);
+            BytesRead += count;
+            return count;
+        }
     }
 }

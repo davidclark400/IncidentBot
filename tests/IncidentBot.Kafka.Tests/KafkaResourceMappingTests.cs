@@ -12,7 +12,8 @@ public sealed class KafkaResourceMappingTests
     {
         var scope = KafkaMetricCatalogTests.Scope();
         var catalog = KafkaMetricCatalogTests.SharedCatalog();
-        var dashboard = new KafkaDashboardGenerator().Generate("orders-production", scope, catalog);
+        var dashboard = new KafkaDashboardGenerator().Generate(
+            "orders-production", catalog.CompilePlan(scope));
         var inventory = Inventory(
             new(KafkaInventoryResourceKinds.Cluster, "kafka.internal:9092", [Evidence]),
             new(KafkaInventoryResourceKinds.Topic, "orders.v1", [Evidence]));
@@ -37,7 +38,8 @@ public sealed class KafkaResourceMappingTests
     {
         var scope = KafkaMetricCatalogTests.Scope();
         var catalog = KafkaMetricCatalogTests.SharedCatalog();
-        var dashboard = new KafkaDashboardGenerator().Generate("orders-production", scope, catalog);
+        var dashboard = new KafkaDashboardGenerator().Generate(
+            "orders-production", catalog.CompilePlan(scope));
 
         var result = new KafkaOnboardingValidator(new KafkaDashboardGenerator()).Validate(
             Inventory(
@@ -127,7 +129,8 @@ public sealed class KafkaResourceMappingTests
     {
         var scope = KafkaMetricCatalogTests.Scope();
         var catalog = KafkaMetricCatalogTests.SharedCatalog();
-        var dashboard = new KafkaDashboardGenerator().Generate("orders-production", scope, catalog);
+        var dashboard = new KafkaDashboardGenerator().Generate(
+            "orders-production", catalog.CompilePlan(scope));
         var mappings = KafkaResourceMappingLoader.Parse("""
             version: 1
             mappings:

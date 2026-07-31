@@ -112,6 +112,7 @@ builder.Services.AddSingleton<IIncidentUpdatePublisher, SignalRIncidentUpdatePub
 if (demoEnabled)
 {
     builder.Services.AddSingleton<DemoIncidentStore>();
+    builder.Services.AddSingleton<DemoReplay>();
     builder.Services.AddSingleton<IIncidentReportReader>(services => services.GetRequiredService<DemoIncidentStore>());
     builder.Services.AddSingleton<IPagerDutyPullService, DemoPagerDutyPullService>();
     if (!generatingOpenApi)
@@ -125,7 +126,7 @@ else
         ?? throw new InvalidOperationException("ConnectionStrings:IncidentBot is required.");
     builder.Services.AddSingleton(NpgsqlDataSource.Create(connectionString));
     builder.Services.AddSingleton<InvestigationProfileStore>();
-    builder.Services.AddSingleton<KafkaMetricPackStore>();
+    builder.Services.AddSingleton<KafkaMetricPlanStore>();
     builder.Services.AddSingleton<DeploymentReadinessChecker>();
     builder.Services.AddSingleton<PagerDutySignatureValidator>();
     builder.Services.AddSingleton<PagerDutyIncidentClient>();
@@ -135,11 +136,13 @@ else
     builder.Services.AddSingleton<IMcpEvidenceAdapter>(services => services.GetRequiredService<McpStreamableHttpClient>());
     builder.Services.AddIncidentEvidenceSources();
     builder.Services.AddSingleton<IIncidentStore, IncidentRepository>();
+    builder.Services.AddSingleton<IIncidentIntake, IncidentIntake>();
     builder.Services.AddSingleton<DurableQueueRepository>();
     builder.Services.AddSingleton<IDurableQueue<WorkItem>>(services => services.GetRequiredService<DurableQueueRepository>());
     builder.Services.AddSingleton<IDurableQueue<OutboxItem>>(services => services.GetRequiredService<DurableQueueRepository>());
     builder.Services.AddSingleton<AdaptiveEvidenceCollector>();
     builder.Services.AddSingleton<ReportComposer>();
+    builder.Services.AddSingleton<InvestigationReportTransitions>();
     builder.Services.AddIncidentRecurrence();
     builder.Services.AddSingleton<LiteLlmSynthesizer>();
     builder.Services.AddSingleton<IInvestigationSynthesizer>(services => services.GetRequiredService<LiteLlmSynthesizer>());

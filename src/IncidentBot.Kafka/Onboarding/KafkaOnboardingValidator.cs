@@ -23,6 +23,7 @@ public sealed class KafkaOnboardingValidator(KafkaDashboardGenerator dashboards)
         ArgumentNullException.ThrowIfNull(catalog);
         var errors = new List<string>();
         IReadOnlyList<KafkaResourceMapping> mappings = [];
+        KafkaMetricPlan? plan = null;
 
         try
         {
@@ -48,7 +49,7 @@ public sealed class KafkaOnboardingValidator(KafkaDashboardGenerator dashboards)
 
         try
         {
-            catalog.ValidateProfile(scope);
+            plan = catalog.CompilePlan(scope);
         }
         catch (InvalidOperationException exception)
         {
@@ -74,19 +75,22 @@ public sealed class KafkaOnboardingValidator(KafkaDashboardGenerator dashboards)
         ValidateCoverage(inventory, "consumer-group", scope.ConsumerGroups, mappings, errors);
         ValidateMappings(inventory, scope, mappings, errors);
 
-        try
+        if (plan is not null)
         {
-            var expected = JsonNode.Parse(dashboards.Generate(profileId, scope, catalog));
-            var actual = JsonNode.Parse(dashboardJson);
-            if (expected is null || actual is null || !JsonNode.DeepEquals(expected, actual))
+            try
             {
-                errors.Add(
-                    "Kafka dashboard does not match the profile allowlists and shared metric-pack definitions; regenerate it.");
+                var expected = JsonNode.Parse(dashboards.Generate(profileId, plan));
+                var actual = JsonNode.Parse(dashboardJson);
+                if (expected is null || actual is null || !JsonNode.DeepEquals(expected, actual))
+                {
+                    errors.Add(
+                        "Kafka dashboard does not match the profile allowlists and shared metric-pack definitions; regenerate it.");
+                }
             }
-        }
-        catch (Exception exception) when (exception is InvalidOperationException or System.Text.Json.JsonException)
-        {
-            errors.Add($"Kafka dashboard validation failed: {exception.Message}");
+            catch (Exception exception) when (exception is InvalidOperationException or System.Text.Json.JsonException)
+            {
+                errors.Add($"Kafka dashboard validation failed: {exception.Message}");
+            }
         }
 
         return new KafkaOnboardingValidationResult(

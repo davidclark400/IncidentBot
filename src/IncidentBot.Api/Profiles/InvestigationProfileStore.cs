@@ -18,16 +18,16 @@ public sealed class InvestigationProfileStore : IInvestigationProfileProvider, I
 
     private readonly ProfileDocument _document;
     private readonly EvidenceSourceRegistry evidenceSources;
-    private readonly KafkaMetricPackStore? kafkaMetricPacks;
+    private readonly KafkaMetricPlanStore? kafkaMetricPlans;
 
     public InvestigationProfileStore(
         IOptions<IncidentBotOptions> options,
         IWebHostEnvironment environment,
         EvidenceSourceRegistry evidenceSources,
-        KafkaMetricPackStore? kafkaMetricPacks = null)
+        KafkaMetricPlanStore? kafkaMetricPlans = null)
     {
         this.evidenceSources = evidenceSources;
-        this.kafkaMetricPacks = kafkaMetricPacks;
+        this.kafkaMetricPlans = kafkaMetricPlans;
         var configuredPath = options.Value.ProfilesPath;
         var path = Path.IsPathRooted(configuredPath)
             ? configuredPath
@@ -125,7 +125,7 @@ public sealed class InvestigationProfileStore : IInvestigationProfileProvider, I
         return issues.Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToList();
     }
 
-    public IReadOnlyDictionary<string, string> FilterPersistedLabels(
+    internal IReadOnlyDictionary<string, string> FilterPersistedLabels(
         InvestigationProfile profile,
         IReadOnlyDictionary<string, string> labels)
     {
@@ -291,12 +291,12 @@ public sealed class InvestigationProfileStore : IInvestigationProfileProvider, I
 
             if (profile.Kafka is not null)
             {
-                if (kafkaMetricPacks is null)
+                if (kafkaMetricPlans is null)
                 {
                     throw new InvalidOperationException(
                         $"Profile '{profile.Id}' enables Kafka but no Kafka metric catalog is available.");
                 }
-                kafkaMetricPacks.ValidateProfile(profile.Kafka);
+                _ = kafkaMetricPlans.Resolve(profile.Kafka);
             }
 
             if (profile.VictoriaLogs?.Queries.Any(query => string.IsNullOrWhiteSpace(query.Name)

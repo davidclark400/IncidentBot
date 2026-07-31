@@ -23,40 +23,34 @@ public sealed class PagerDutyEvidenceConnector(
             Source, transport, mcp, context, scope,
             new { incidentId = context.PagerDutyIncidentId }, async ct =>
         {
-            var budget = new ConnectorByteBudget(scope.MaxBytes, transport.MaxBytes, 1);
+            var budget = new ConnectorResponseBudget(scope.MaxBytes, transport.MaxBytes, 1);
             const string operation = "GET /incidents/{id}";
-            var allowance = budget.BeginOperation(operation);
-            if (allowance <= 0)
+            var json = await budget.TryReadJsonAsync(
+                operation,
+                async operationCancellationToken =>
+                {
+                    using var request = ConnectorUtilities.CreateRequest(
+                        HttpMethod.Get,
+                        ConnectorUtilities.Url(
+                            transport,
+                            $"incidents/{Uri.EscapeDataString(context.PagerDutyIncidentId)}"),
+                        transport,
+                        credentials);
+                    var token = credentials.Get(transport.CredentialEnv);
+                    if (!string.IsNullOrWhiteSpace(token))
+                    {
+                        request.Headers.Authorization = new AuthenticationHeaderValue("Token", $"token={token}");
+                    }
+                    request.Headers.TryAddWithoutValidation(
+                        "Accept", "application/vnd.pagerduty+json;version=2");
+                    return await httpClientFactory.CreateClient().SendAsync(
+                        request,
+                        HttpCompletionOption.ResponseHeadersRead,
+                        operationCancellationToken);
+                },
+                ct);
+            if (json is null)
             {
-                return new ConnectorResult(
-                    Source, SourceHealth.Partial, [], [], [], 0, budget.Diagnostic);
-            }
-
-            using var request = ConnectorUtilities.CreateRequest(
-                HttpMethod.Get,
-                ConnectorUtilities.Url(transport, $"incidents/{Uri.EscapeDataString(context.PagerDutyIncidentId)}"),
-                transport,
-                credentials);
-            var token = credentials.Get(transport.CredentialEnv);
-            if (!string.IsNullOrWhiteSpace(token))
-            {
-                request.Headers.Authorization = new AuthenticationHeaderValue("Token", $"token={token}");
-            }
-            request.Headers.TryAddWithoutValidation("Accept", "application/vnd.pagerduty+json;version=2");
-            using var response = await httpClientFactory.CreateClient().SendAsync(
-                request, HttpCompletionOption.ResponseHeadersRead, ct);
-            JsonDocument json;
-            try
-            {
-                json = await ConnectorUtilities.ReadBoundedJsonAsync(
-                    response,
-                    budget.SafeReadLimit(allowance, response.Content),
-                    ct,
-                    budget.ObserveBytesRead);
-            }
-            catch (InvalidOperationException exception) when (ConnectorUtilities.IsByteLimitException(exception))
-            {
-                budget.RecordLimited(operation);
                 return new ConnectorResult(
                     Source, SourceHealth.Partial, [], [], [], 0, budget.Diagnostic);
             }

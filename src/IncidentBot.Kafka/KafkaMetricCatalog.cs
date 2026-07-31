@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -24,12 +25,8 @@ public sealed partial class KafkaMetricCatalog
 
     private KafkaMetricCatalog(KafkaMetricPackDocument document)
     {
-        Document = document;
         packs = document.Packs.ToDictionary(pack => pack.Id, StringComparer.Ordinal);
     }
-
-    public KafkaMetricPackDocument Document { get; }
-    public IReadOnlyList<KafkaMetricPack> Packs => packs.Values.OrderBy(pack => pack.Id, StringComparer.Ordinal).ToArray();
 
     public static KafkaMetricCatalog Load(string path)
     {
@@ -56,14 +53,13 @@ public sealed partial class KafkaMetricCatalog
         return new KafkaMetricCatalog(document);
     }
 
-    public KafkaMetricPack GetPack(string id) => packs.TryGetValue(id, out var pack)
-        ? pack
-        : throw new InvalidOperationException($"Kafka metric pack '{id}' was not found.");
-
-    public void ValidateProfile(KafkaProfileScope scope)
+    public KafkaMetricPlan CompilePlan(KafkaProfileScope scope)
     {
         KafkaPromQlRenderer.ValidateScope(scope);
-        var pack = GetPack(scope.MetricPackId);
+        var pack = packs.TryGetValue(scope.MetricPackId, out var selected)
+            ? selected
+            : throw new InvalidOperationException(
+                $"Kafka metric pack '{scope.MetricPackId}' was not found.");
         if (scope.ConsumerGroups.Count == 0
             && pack.Metrics.Any(metric => metric.IsRequired && metric.ResourceScope == "consumer-group"))
         {
@@ -77,9 +73,45 @@ public sealed partial class KafkaMetricCatalog
                     $"Kafka threshold override '{metricId}' is not defined by metric pack '{pack.Id}'.");
             _ = EffectiveThresholds(metric, thresholdOverride);
         }
+
+        var metrics = pack.Metrics
+            .OrderBy(metric => metric.Id, StringComparer.Ordinal)
+            .Select(metric =>
+            {
+                var labels = KafkaPromQlRenderer.ScopeLabelKeys(metric.PromQl);
+                return new KafkaPlannedMetric(
+                    metric.Id,
+                    metric.Title,
+                    metric.Category,
+                    metric.DatasourceUid,
+                    metric.ResourceScope,
+                    metric.Unit,
+                    metric.TimeReducer,
+                    metric.EvidenceMode,
+                    metric.Requirement,
+                    metric.DashboardRow,
+                    EffectiveThresholds(
+                        metric,
+                        scope.ThresholdOverrides.GetValueOrDefault(metric.Id)),
+                    KafkaPromQlRenderer.Render(metric.PromQl, scope),
+                    KafkaPromQlRenderer.RenderForGrafanaVariables(metric.PromQl, scope),
+                    new KafkaExpectedScopeLabels(
+                        labels["clusterRegex"].ToImmutableHashSet(StringComparer.Ordinal),
+                        labels["topicRegex"].ToImmutableHashSet(StringComparer.Ordinal),
+                        labels["consumerGroupRegex"].ToImmutableHashSet(StringComparer.Ordinal)));
+            })
+            .ToImmutableArray();
+
+        return new KafkaMetricPlan(
+            pack.Id,
+            pack.Title,
+            scope.Cluster,
+            scope.Topics.Order(StringComparer.Ordinal).ToImmutableArray(),
+            scope.ConsumerGroups.Order(StringComparer.Ordinal).ToImmutableArray(),
+            metrics);
     }
 
-    public KafkaEffectiveThresholds EffectiveThresholds(
+    private static KafkaEffectiveThresholds EffectiveThresholds(
         KafkaMetricDefinition metric,
         KafkaMetricThresholdOverride? thresholdOverride = null)
     {
@@ -142,7 +174,6 @@ public sealed partial class KafkaMetricCatalog
         }
 
         var placeholders = KafkaPromQlRenderer.ValidateTemplate(metric.PromQl);
-        var scopeLabelKeys = KafkaPromQlRenderer.ScopeLabelKeys(metric.PromQl);
         if (!placeholders.Contains("clusterRegex"))
         {
             throw new InvalidOperationException($"Kafka metric '{metric.Id}' must scope PromQL by clusterRegex.");
@@ -156,6 +187,19 @@ public sealed partial class KafkaMetricCatalog
             throw new InvalidOperationException(
                 $"Kafka metric '{metric.Id}' must scope PromQL by consumerGroupRegex.");
         }
+        var requiredSelectorScopes = metric.ResourceScope switch
+        {
+            "cluster" => new HashSet<string>(["clusterRegex"], StringComparer.Ordinal),
+            "topic" => new HashSet<string>(["clusterRegex", "topicRegex"], StringComparer.Ordinal),
+            "consumer-group" => new HashSet<string>(
+                ["clusterRegex", "topicRegex", "consumerGroupRegex"],
+                StringComparer.Ordinal),
+            _ => throw new InvalidOperationException(
+                $"Kafka metric '{metric.Id}' has unsupported resource scope '{metric.ResourceScope}'.")
+        };
+        var scopeLabelKeys = KafkaPromQlRenderer.ValidateSelectorScopes(
+            metric.PromQl,
+            requiredSelectorScopes);
         foreach (var placeholder in placeholders)
         {
             if (scopeLabelKeys[placeholder].Count == 0)

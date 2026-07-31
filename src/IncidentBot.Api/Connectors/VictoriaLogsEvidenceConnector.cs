@@ -41,7 +41,7 @@ public sealed class VictoriaLogsEvidenceConnector(
             var streamFilterIdentity = JsonSerializer.Serialize(configuration.StreamFilters
                 .OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .ThenBy(pair => pair.Value, StringComparer.Ordinal));
-            var budget = new ConnectorByteBudget(
+            var budget = new ConnectorResponseBudget(
                 scope.MaxBytes,
                 transport.MaxBytes,
                 configuration.Queries.Count * 2);
@@ -66,38 +66,34 @@ public sealed class VictoriaLogsEvidenceConnector(
                 };
                 var hitsUrl = ConnectorUtilities.Url(transport, "select/logsql/hits");
                 var hitsOperation = $"POST /select/logsql/hits ({configuredQuery.Name})";
-                var hitsAllowance = budget.BeginOperation(hitsOperation);
-                if (hitsAllowance <= 0)
+                var hitsJson = await budget.TryReadJsonAsync(
+                    hitsOperation,
+                    async operationCancellationToken =>
+                    {
+                        using var hitsRequest = ConnectorUtilities.CreateRequest(
+                            HttpMethod.Post, hitsUrl, transport, credentials);
+                        hitsRequest.Headers.TryAddWithoutValidation("AccountID", configuration.AccountId);
+                        hitsRequest.Headers.TryAddWithoutValidation("ProjectID", configuration.ProjectId);
+                        hitsRequest.Content = new FormUrlEncodedContent(common.Concat(new[]
+                        {
+                            new KeyValuePair<string, string>("step", "60s")
+                        }));
+                        return await client.SendAsync(
+                            hitsRequest,
+                            HttpCompletionOption.ResponseHeadersRead,
+                            operationCancellationToken);
+                    },
+                    ct);
+                if (hitsJson is null)
                 {
-                    budget.RemovePlannedOperation();
+                    budget.SkipPlannedOperation();
                     continue;
                 }
 
                 long total;
-                try
+                using (hitsJson)
                 {
-                    using var hitsRequest = ConnectorUtilities.CreateRequest(
-                        HttpMethod.Post, hitsUrl, transport, credentials);
-                    hitsRequest.Headers.TryAddWithoutValidation("AccountID", configuration.AccountId);
-                    hitsRequest.Headers.TryAddWithoutValidation("ProjectID", configuration.ProjectId);
-                    hitsRequest.Content = new FormUrlEncodedContent(common.Concat(new[]
-                    {
-                        new KeyValuePair<string, string>("step", "60s")
-                    }));
-                    using var hitsResponse = await client.SendAsync(
-                        hitsRequest, HttpCompletionOption.ResponseHeadersRead, ct);
-                    using var hitsJson = await ConnectorUtilities.ReadBoundedJsonAsync(
-                        hitsResponse,
-                        budget.SafeReadLimit(hitsAllowance, hitsResponse.Content),
-                        ct,
-                        budget.ObserveBytesRead);
                     total = TotalHits(hitsJson.RootElement);
-                }
-                catch (InvalidOperationException exception) when (ConnectorUtilities.IsByteLimitException(exception))
-                {
-                    budget.RecordLimited(hitsOperation);
-                    budget.RemovePlannedOperation();
-                    continue;
                 }
 
                 var summary = $"{configuredQuery.Name}: {total} matching log events";
@@ -127,7 +123,7 @@ public sealed class VictoriaLogsEvidenceConnector(
 
                 if (total <= 0)
                 {
-                    budget.RemovePlannedOperation();
+                    budget.SkipPlannedOperation();
                     continue;
                 }
 
@@ -144,29 +140,22 @@ public sealed class VictoriaLogsEvidenceConnector(
                 };
                 var queryUrl = ConnectorUtilities.Url(transport, "select/logsql/query");
                 var sampleOperation = $"POST /select/logsql/query ({prepared.Configuration.Name})";
-                var sampleAllowance = budget.BeginOperation(sampleOperation);
-                if (sampleAllowance <= 0) continue;
-                string sampleText;
-                try
-                {
-                    using var sampleRequest = ConnectorUtilities.CreateRequest(
-                        HttpMethod.Post, queryUrl, transport, credentials);
-                    sampleRequest.Headers.TryAddWithoutValidation("AccountID", configuration.AccountId);
-                    sampleRequest.Headers.TryAddWithoutValidation("ProjectID", configuration.ProjectId);
-                    sampleRequest.Content = new FormUrlEncodedContent(sampleForm);
-                    using var sampleResponse = await client.SendAsync(
-                        sampleRequest, HttpCompletionOption.ResponseHeadersRead, ct);
-                    sampleText = await ConnectorUtilities.ReadBoundedTextAsync(
-                        sampleResponse,
-                        budget.SafeReadLimit(sampleAllowance, sampleResponse.Content),
-                        ct,
-                        budget.ObserveBytesRead);
-                }
-                catch (InvalidOperationException exception) when (ConnectorUtilities.IsByteLimitException(exception))
-                {
-                    budget.RecordLimited(sampleOperation);
-                    continue;
-                }
+                var sampleText = await budget.TryReadTextAsync(
+                    sampleOperation,
+                    async operationCancellationToken =>
+                    {
+                        using var sampleRequest = ConnectorUtilities.CreateRequest(
+                            HttpMethod.Post, queryUrl, transport, credentials);
+                        sampleRequest.Headers.TryAddWithoutValidation("AccountID", configuration.AccountId);
+                        sampleRequest.Headers.TryAddWithoutValidation("ProjectID", configuration.ProjectId);
+                        sampleRequest.Content = new FormUrlEncodedContent(sampleForm);
+                        return await client.SendAsync(
+                            sampleRequest,
+                            HttpCompletionOption.ResponseHeadersRead,
+                            operationCancellationToken);
+                    },
+                    ct);
+                if (sampleText is null) continue;
 
                 var lines = sampleText.Split('\n', StringSplitOptions.RemoveEmptyEntries)
                     .Distinct(StringComparer.Ordinal)

@@ -4,7 +4,7 @@ namespace IncidentBot.Api.Demo;
 
 public sealed class DemoPagerDutyPullService(
     DemoIncidentStore store,
-    IIncidentUpdatePublisher updates) : IPagerDutyPullService
+    DemoReplay replay) : IPagerDutyPullService
 {
     public Task<PagerDutyIncidentPage> GetRecentAsync(
         DateTimeOffset since,
@@ -39,13 +39,7 @@ public sealed class DemoPagerDutyPullService(
         CancellationToken cancellationToken)
     {
         if (!string.Equals(pagerDutyIncidentId, "PDEMO", StringComparison.Ordinal)) return null;
-        var reset = store.Reset();
-        await updates.PublishReportAsync(
-            DemoIncidentStore.IncidentId,
-            reset.Report.Version,
-            reset.Report.Status,
-            ["status", "summary", "timeline", "evidence", "sources", "causalEvents", "ai", "problem"],
-            cancellationToken);
+        await replay.ResetAsync(cancellationToken);
         return new PulledIncidentTrigger(
             DemoIncidentStore.IncidentId,
             $"/incidents/{DemoIncidentStore.IncidentId}",

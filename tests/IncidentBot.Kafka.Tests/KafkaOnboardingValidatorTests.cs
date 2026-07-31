@@ -10,7 +10,8 @@ public sealed class KafkaOnboardingValidatorTests
     {
         var scope = KafkaMetricCatalogTests.Scope();
         var catalog = KafkaMetricCatalogTests.SharedCatalog();
-        var dashboard = new KafkaDashboardGenerator().Generate("orders-production", scope, catalog);
+        var dashboard = new KafkaDashboardGenerator().Generate(
+            "orders-production", catalog.CompilePlan(scope));
         var inventory = Inventory(
             new(KafkaInventoryResourceKinds.Cluster, scope.Cluster, [Evidence]),
             new(KafkaInventoryResourceKinds.Topic, "orders.v1", [Evidence]),
@@ -27,7 +28,8 @@ public sealed class KafkaOnboardingValidatorTests
     {
         var scope = KafkaMetricCatalogTests.Scope();
         var catalog = KafkaMetricCatalogTests.SharedCatalog();
-        var dashboard = new KafkaDashboardGenerator().Generate("orders-production", scope, catalog);
+        var dashboard = new KafkaDashboardGenerator().Generate(
+            "orders-production", catalog.CompilePlan(scope));
         var inventory = new KafkaApplicationInventory(
             1,
             "production",
@@ -50,7 +52,8 @@ public sealed class KafkaOnboardingValidatorTests
     {
         var scope = KafkaMetricCatalogTests.Scope();
         var catalog = KafkaMetricCatalogTests.SharedCatalog();
-        var dashboard = new KafkaDashboardGenerator().Generate("orders-production", scope, catalog)
+        var dashboard = new KafkaDashboardGenerator().Generate(
+                "orders-production", catalog.CompilePlan(scope))
             .Replace("incidentbot_fixture_kafka_topic_bytes_total", "drifted_metric", StringComparison.Ordinal);
 
         var result = new KafkaOnboardingValidator(new KafkaDashboardGenerator()).Validate(
@@ -69,7 +72,8 @@ public sealed class KafkaOnboardingValidatorTests
     {
         var scope = KafkaMetricCatalogTests.Scope();
         var catalog = KafkaMetricCatalogTests.SharedCatalog();
-        var dashboard = new KafkaDashboardGenerator().Generate("orders-production", scope, catalog);
+        var dashboard = new KafkaDashboardGenerator().Generate(
+            "orders-production", catalog.CompilePlan(scope));
         var inventory = new KafkaApplicationInventory(version, "production", [], []);
 
         var result = new KafkaOnboardingValidator(new KafkaDashboardGenerator()).Validate(

@@ -69,12 +69,12 @@ public sealed class FingerprintingTests
     [Fact]
     public void DifferentServicesAndKnownEnvironmentsDoNotMatch()
     {
-        var matcher = Matcher();
+        var policy = Policy();
         var fingerprint = Fingerprint(Features(service: "payments", scopes: ["production"]));
         var otherService = Candidate(Fingerprint(Features(service: "catalog", scopes: ["production"])));
         var otherEnvironment = Candidate(Fingerprint(Features(service: "payments", scopes: ["staging"])));
 
-        Assert.Empty(matcher.Rank(fingerprint, [otherService, otherEnvironment]));
+        Assert.Empty(policy.RankPossible(fingerprint, [otherService, otherEnvironment]));
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public sealed class FingerprintingTests
         var current = Fingerprint(Features(scopes: ["environment:production", "region:eu-west"]));
         var historical = Fingerprint(Features(scopes: ["environment:staging", "region:eu-west"]));
 
-        Assert.Empty(Matcher().Rank(current, [Candidate(historical)]));
+        Assert.Empty(Policy().RankPossible(current, [Candidate(historical)]));
     }
 
     [Fact]
@@ -128,11 +128,11 @@ public sealed class FingerprintingTests
     [Fact]
     public void ErrorAndCodeMatchesProduceAnAutomaticExplainableScore()
     {
-        var matcher = Matcher();
+        var policy = Policy();
         var current = Fingerprint(Features(title: "provider timeout checkout", errors: ["provider timeout"], code: ["payments:providerclient.sendasync"]));
         var historical = Fingerprint(Features(title: "checkout provider timed out", errors: ["provider timeout"], code: ["payments:providerclient.sendasync"]));
 
-        var match = matcher.Automatic(current, [Candidate(historical)]);
+        var match = policy.SelectAssociation(current, [Candidate(historical)], existingGroupId: null);
 
         Assert.NotNull(match);
         Assert.True(match.Score >= 80);
@@ -143,15 +143,14 @@ public sealed class FingerprintingTests
     [Fact]
     public void FamilyEqualityCannotOverrideConflictingExactSymptoms()
     {
-        var matcher = Matcher();
+        var policy = Policy();
         var current = Fingerprint(Features(errors: ["database refused connection"], code: ["payments:dbclient.open"]));
         var historical = Fingerprint(Features(errors: ["provider request timeout"], code: ["payments:providerclient.send"]));
         historical = historical with { FamilyHash = current.FamilyHash };
+        var candidates = new[] { Candidate(historical) };
 
-        var score = Assert.Single(matcher.Rank(current, [Candidate(historical)]));
-
-        Assert.True(score.Score < 60);
-        Assert.Null(matcher.Automatic(current, [Candidate(historical)]));
+        Assert.Empty(policy.RankPossible(current with { Stage = FingerprintStage.Provisional }, candidates));
+        Assert.Null(policy.SelectAssociation(current, candidates, existingGroupId: null));
     }
 
     [Fact]
@@ -159,8 +158,11 @@ public sealed class FingerprintingTests
     {
         var current = Fingerprint(Features());
         var historical = current with { AlgorithmVersion = "v2" };
+        var policy = Policy();
+        var candidates = new[] { Candidate(historical) };
 
-        Assert.Empty(Matcher().Rank(current, [Candidate(historical)]));
+        Assert.Empty(policy.RankPossible(current with { Stage = FingerprintStage.Provisional }, candidates));
+        Assert.Null(policy.SelectAssociation(current, candidates, existingGroupId: null));
     }
 
     [Fact]
@@ -168,10 +170,127 @@ public sealed class FingerprintingTests
     {
         var fingerprint = Fingerprint(Features());
         var candidate = Candidate(fingerprint);
-        var matcher = Matcher();
+        var policy = Policy();
 
-        Assert.Single(matcher.Preview(fingerprint, [candidate]));
-        Assert.Empty(matcher.Possible(fingerprint, [candidate]));
+        Assert.Single(policy.RankPossible(fingerprint with { Stage = FingerprintStage.Provisional }, [candidate]));
+        Assert.Empty(policy.RankPossible(fingerprint, [candidate]));
+    }
+
+    [Fact]
+    public void ProvisionalCandidateRankingPrioritizesExactMatchesOverRecency()
+    {
+        var fingerprint = Fingerprint(Features());
+        var exact = Candidate(
+            fingerprint,
+            "PAYMENTS-EXACT-1234",
+            DateTimeOffset.Parse("2026-07-01T10:00:00Z"));
+        var similar = Candidate(
+            Fingerprint(Features(
+                title: "unrelated title",
+                errors: ["provider timeout"],
+                code: ["payments:otherclient.sendasync"])),
+            "PAYMENTS-SIMILAR-5678",
+            DateTimeOffset.Parse("2026-07-12T10:00:00Z"));
+
+        var ranked = Policy().RankPossible(
+            fingerprint with { Stage = FingerprintStage.Provisional },
+            [similar, exact]);
+
+        Assert.Equal([exact, similar], ranked.Select(value => value.Candidate));
+        Assert.Equal("exact", ranked[0].MatchType);
+        Assert.Equal(100, ranked[0].Score);
+    }
+
+    [Fact]
+    public void FinalCandidateThresholdsSeparatePossibleFromAutomaticMatches()
+    {
+        var fingerprint = Fingerprint(Features());
+        var possible = Candidate(Fingerprint(Features(
+            title: "unrelated title",
+            errors: ["provider timeout"],
+            code: ["payments:otherclient.sendasync"])));
+        var exact = Candidate(fingerprint);
+        var policy = Policy();
+
+        var possibleMatch = Assert.Single(policy.RankPossible(fingerprint, [possible]));
+
+        Assert.InRange(possibleMatch.Score, 60, 79);
+        Assert.Null(policy.SelectAssociation(fingerprint, [possible], existingGroupId: null));
+        Assert.Empty(policy.RankPossible(fingerprint, [exact]));
+        Assert.Equal("exact", policy.SelectAssociation(fingerprint, [exact], existingGroupId: null)?.MatchType);
+    }
+
+    [Fact]
+    public void ProblemKeysAreDerivedByTheRecurrencePolicy()
+    {
+        var fingerprint = Fingerprint(Features(service: "payments"));
+
+        var problemKey = RecurrencePolicy.ProblemKey(fingerprint);
+
+        Assert.Equal($"PAYMENTS-CHECKOUT-{fingerprint.ExactHash[..20].ToUpperInvariant()}", problemKey);
+    }
+
+    [Fact]
+    public void SameFamilyWithDifferentExactEvidenceGetsDistinctProblemKeys()
+    {
+        var first = Fingerprint(Features(
+            errors: ["provider timeout"],
+            code: ["payments:providerclient.sendasync"]));
+        var second = Fingerprint(Features(
+            errors: ["database corruption"],
+            code: ["payments:databaseclient.readasync"]));
+
+        Assert.Equal(first.FamilyHash, second.FamilyHash);
+        Assert.NotEqual(first.ExactHash, second.ExactHash);
+        Assert.NotEqual(
+            RecurrencePolicy.ProblemKey(first),
+            RecurrencePolicy.ProblemKey(second));
+    }
+
+    [Fact]
+    public void LifecycleClassificationAppliesResolutionRegressionEscalationAndOccurrenceRulesInOrder()
+    {
+        var policy = Policy();
+
+        Assert.Equal(ProblemLifecycleState.Resolved,
+            policy.ClassifyLifecycle(ProblemLifecycleState.Escalating, IncidentState.Resolved, active: false, occurrenceCount: 4, recentCount: 4));
+        Assert.Equal(ProblemLifecycleState.Regressed,
+            policy.ClassifyLifecycle(ProblemLifecycleState.Resolved, IncidentState.Triggered, active: true, occurrenceCount: 4, recentCount: 4));
+        Assert.Equal(ProblemLifecycleState.Escalating,
+            policy.ClassifyLifecycle(ProblemLifecycleState.Ongoing, IncidentState.Triggered, active: true, occurrenceCount: 4, recentCount: 3));
+        Assert.Equal(ProblemLifecycleState.New,
+            policy.ClassifyLifecycle(previous: null, IncidentState.Triggered, active: true, occurrenceCount: 1, recentCount: 1));
+        Assert.Equal(ProblemLifecycleState.Ongoing,
+            policy.ClassifyLifecycle(ProblemLifecycleState.New, IncidentState.Triggered, active: true, occurrenceCount: 2, recentCount: 2));
+    }
+
+    [Fact]
+    public void RetentionLifecycleClassificationUsesTheCurrentOccurrenceProjection()
+    {
+        var policy = Policy();
+
+        Assert.Equal(ProblemLifecycleState.Resolved,
+            policy.ClassifyAfterRetention(active: false, occurrenceCount: 2, recentCount: 2));
+        Assert.Equal(ProblemLifecycleState.Escalating,
+            policy.ClassifyAfterRetention(active: true, occurrenceCount: 3, recentCount: 3));
+        Assert.Equal(ProblemLifecycleState.New,
+            policy.ClassifyAfterRetention(active: true, occurrenceCount: 1, recentCount: 1));
+        Assert.Equal(ProblemLifecycleState.Ongoing,
+            policy.ClassifyAfterRetention(active: true, occurrenceCount: 2, recentCount: 2));
+    }
+
+    [Fact]
+    public void CandidateAndEscalationCutoffsComeFromTheRecurrencePolicy()
+    {
+        var now = DateTimeOffset.Parse("2026-07-14T12:00:00Z");
+        var policy = Policy(new IncidentBotOptions
+        {
+            FingerprintCandidateLookbackDays = 30,
+            FingerprintEscalationWindowDays = 7
+        });
+
+        Assert.Equal(now - TimeSpan.FromDays(30), policy.CandidateCutoff(now));
+        Assert.Equal(now - TimeSpan.FromDays(7), policy.EscalationCutoff(now));
     }
 
     [Fact]
@@ -225,11 +344,16 @@ public sealed class FingerprintingTests
         Assert.Null(report.Problem);
     }
 
-    private static FingerprintMatcher Matcher() => new(Microsoft.Extensions.Options.Options.Create(new IncidentBotOptions()));
+    private static RecurrencePolicy Policy(IncidentBotOptions? options = null) =>
+        new(Microsoft.Extensions.Options.Options.Create(options ?? new IncidentBotOptions()));
 
-    private static ProblemCandidate Candidate(IncidentFingerprint fingerprint) => new(
-        Guid.NewGuid(), "PAYMENTS-CHECKOUT-1234", fingerprint, ProblemLifecycleState.Ongoing, 2,
-        DateTimeOffset.Parse("2026-07-01T10:00:00Z"), DateTimeOffset.Parse("2026-07-10T10:00:00Z"));
+    private static ProblemCandidate Candidate(
+        IncidentFingerprint fingerprint,
+        string problemKey = "PAYMENTS-CHECKOUT-1234",
+        DateTimeOffset? lastSeen = null) => new(
+        Guid.NewGuid(), problemKey, fingerprint, ProblemLifecycleState.Ongoing, 2,
+        DateTimeOffset.Parse("2026-07-01T10:00:00Z"),
+        lastSeen ?? DateTimeOffset.Parse("2026-07-10T10:00:00Z"));
 
     private static IncidentFingerprint Fingerprint(FingerprintFeatures features) =>
         new FingerprintGenerator().Generate(features, FingerprintStage.Final);

@@ -10,22 +10,26 @@ public sealed class DemoIncidentStore(TimeProvider timeProvider) : IIncidentRepo
     public static readonly Guid IncidentId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
     private readonly object _gate = new();
-    private readonly Channel<int> _starts = Channel.CreateUnbounded<int>(new UnboundedChannelOptions
+    private readonly Channel<int> _starts = Channel.CreateBounded<int>(new BoundedChannelOptions(1)
     {
+        FullMode = BoundedChannelFullMode.DropOldest,
         SingleReader = true,
-        SingleWriter = false
+        SingleWriter = false,
+        AllowSynchronousContinuations = false
     });
     private int _generation;
+    private int _version;
     private DateTimeOffset _baseTime = timeProvider.GetUtcNow();
     private InvestigationReport _report = null!;
 
-    public (int Generation, InvestigationReport Report) Reset()
+    internal (int Generation, InvestigationReport Report) Reset()
     {
         lock (_gate)
         {
             _generation++;
+            _version++;
             _baseTime = timeProvider.GetUtcNow();
-            _report = BuildReport(0);
+            _report = BuildReport(0, _version);
             _starts.Writer.TryWrite(_generation);
             return (_generation, _report);
         }
@@ -35,7 +39,12 @@ public sealed class DemoIncidentStore(TimeProvider timeProvider) : IIncidentRepo
     {
         lock (_gate)
         {
-            return _report ?? BuildReport(0);
+            if (_report is null)
+            {
+                _version++;
+                _report = BuildReport(0, _version);
+            }
+            return _report;
         }
     }
 
@@ -44,20 +53,29 @@ public sealed class DemoIncidentStore(TimeProvider timeProvider) : IIncidentRepo
             ? IncidentReportState.From(Get())
             : null);
 
-    public InvestigationReport? Advance(int generation, int phase)
+    internal InvestigationReport? Advance(int generation, int phase)
     {
         lock (_gate)
         {
             if (generation != _generation) return null;
-            _report = BuildReport(phase);
+            _version++;
+            _report = BuildReport(phase, _version);
             return _report;
         }
     }
 
-    public IAsyncEnumerable<int> ReadStartsAsync(CancellationToken cancellationToken) =>
+    internal bool IsCurrentGeneration(int generation)
+    {
+        lock (_gate)
+        {
+            return generation == _generation;
+        }
+    }
+
+    internal IAsyncEnumerable<int> ReadStartsAsync(CancellationToken cancellationToken) =>
         _starts.Reader.ReadAllAsync(cancellationToken);
 
-    private InvestigationReport BuildReport(int phase)
+    private InvestigationReport BuildReport(int phase, int version)
     {
         var codeReference = new CodeReference(
             "code-timeout-handler-43-44", "platform/payments", "abcdef1234567890",
@@ -174,7 +192,7 @@ public sealed class DemoIncidentStore(TimeProvider timeProvider) : IIncidentRepo
             IncidentId, "PDEMO", "payments-api", "payments-production", "demo-v1",
             "Payment authorisations timing out", "high", IncidentState.Triggered,
             phase >= 6 ? IncidentProgression.Ready : IncidentProgression.Collecting,
-            _baseTime, timeProvider.GetUtcNow(), phase + 1,
+            _baseTime, timeProvider.GetUtcNow(), version,
             summary, ai, timeline, evidence.OrderByDescending(item => item.OccurredAt).ToList(), sources,
             [
                 new SourceLink("PagerDuty incident", "https://pagerduty.example/incidents/PDEMO"),

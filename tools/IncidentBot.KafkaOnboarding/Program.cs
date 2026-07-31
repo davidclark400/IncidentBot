@@ -61,9 +61,9 @@ public static class KafkaOnboardingCommand
         var outputPath = options.Required("output");
         var scope = KafkaProfileScopeLoader.Load(profilesPath, profileId);
         var catalog = KafkaMetricCatalog.Load(metricPacksPath);
+        var plan = catalog.CompilePlan(scope);
         var generator = new KafkaDashboardGenerator();
-        var json = generator.Generate(profileId, scope, catalog);
-        if (options.Check && !generator.Check(outputPath, profileId, scope, catalog, out var diagnostic))
+        if (options.Check && !generator.Check(outputPath, profileId, plan, out var diagnostic))
         {
             error.WriteLine(diagnostic);
             return 1;
@@ -73,6 +73,7 @@ public static class KafkaOnboardingCommand
             output.WriteLine("Kafka dashboard is current.");
             return 0;
         }
+        var json = generator.Generate(profileId, plan);
         return WriteOrCheck(outputPath, json, check: false, "Kafka dashboard", output);
     }
 

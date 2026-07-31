@@ -122,6 +122,65 @@ public sealed class PostgresFingerprintingTests(PostgresFixture database) : IAsy
     }
 
     [Fact]
+    public async Task ConcurrentAutomaticSimilarityMatchesCreateOneProblemGroup()
+    {
+        var repository = Repository();
+        var first = Incident("PD-CONCURRENT-SIMILAR-1", IncidentState.Triggered);
+        var second = Incident("PD-CONCURRENT-SIMILAR-2", IncidentState.Triggered);
+        var firstFingerprint = SimilarFingerprint(includeAdditionalError: false);
+        var secondFingerprint = SimilarFingerprint(includeAdditionalError: true);
+        Assert.Equal(firstFingerprint.FamilyHash, secondFingerprint.FamilyHash);
+        Assert.NotEqual(firstFingerprint.ExactHash, secondFingerprint.ExactHash);
+
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        await using var blockerConnection = await database.DataSource.OpenConnectionAsync(cancellation.Token);
+        await using var blockerTransaction = await blockerConnection.BeginTransactionAsync(cancellation.Token);
+        var blockerPid = await BackendPidAsync(blockerConnection, blockerTransaction, cancellation.Token);
+        await using (var blocker = new NpgsqlCommand(
+                         "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+                         blockerConnection,
+                         blockerTransaction))
+        {
+            blocker.Parameters.AddWithValue(
+                $"association|{firstFingerprint.AlgorithmVersion}|{firstFingerprint.Features.ServiceId}|{firstFingerprint.Features.ProfileId}");
+            await blocker.ExecuteNonQueryAsync(cancellation.Token);
+        }
+
+        var matchTasks = new[]
+        {
+            repository.MatchOrCreateAsync(first, firstFingerprint, cancellation.Token),
+            repository.MatchOrCreateAsync(second, secondFingerprint, cancellation.Token)
+        };
+        try
+        {
+            await WaitForAdvisoryLockWaitersAsync(blockerPid, matchTasks.Length, cancellation.Token);
+        }
+        catch
+        {
+            cancellation.Cancel();
+            await blockerTransaction.RollbackAsync(CancellationToken.None);
+            try
+            {
+                await Task.WhenAll(matchTasks);
+            }
+            catch
+            {
+                // Preserve the lock-synchronization failure that made the regression test invalid.
+            }
+            throw;
+        }
+
+        await blockerTransaction.CommitAsync(cancellation.Token);
+        var matches = await Task.WhenAll(matchTasks);
+
+        Assert.Contains(matches, match => match.MatchType == "new");
+        Assert.Contains(matches, match => match.MatchType == "family" && match.Score >= 80);
+        Assert.Equal(matches[0].ProblemGroupId, matches[1].ProblemGroupId);
+        Assert.Equal(1, await ScalarAsync<int>("select count(*) from problem_groups"));
+        Assert.Equal(2, await ScalarAsync<int>("select count(*) from problem_occurrences"));
+    }
+
+    [Fact]
     public async Task ConcurrentRerunsOfOneIncidentKeepOneStableAssignment()
     {
         var repository = Repository();
@@ -270,10 +329,17 @@ public sealed class PostgresFingerprintingTests(PostgresFixture database) : IAsy
             age.Parameters.AddWithValue(old.Id);
             await age.ExecuteNonQueryAsync();
         }
+        await using (var regress = database.DataSource.CreateCommand(
+                         "update problem_groups set lifecycle_state = 'regressed' where id = $1"))
+        {
+            regress.Parameters.AddWithValue(group.ProblemGroupId);
+            await regress.ExecuteNonQueryAsync();
+        }
 
         await repository.PurgeAsync(DateTimeOffset.UtcNow - TimeSpan.FromDays(365), CancellationToken.None);
 
         Assert.Equal(1, await ScalarAsync<int>("select occurrence_count from problem_groups where id = '" + group.ProblemGroupId + "'"));
+        Assert.Equal("new", await ScalarAsync<string>("select lifecycle_state from problem_groups where id = '" + group.ProblemGroupId + "'"));
         Assert.Equal(1, await ScalarAsync<int>("select count(*) from problem_occurrences"));
 
         await using (var ageRemaining = database.DataSource.CreateCommand(
@@ -289,9 +355,56 @@ public sealed class PostgresFingerprintingTests(PostgresFixture database) : IAsy
 
     private ProblemRepository Repository()
     {
-        var matcher = new FingerprintMatcher(_options);
-        var policy = new RecurrencePolicy(matcher, _options);
+        var policy = new RecurrencePolicy(_options);
         return new ProblemRepository(database.DataSource, policy, TimeProvider.System, NullLogger<ProblemRepository>.Instance);
+    }
+
+    private static async Task<int> BackendPidAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand("select pg_backend_pid()", connection, transaction);
+        return Convert.ToInt32(
+            await command.ExecuteScalarAsync(cancellationToken),
+            System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private async Task WaitForAdvisoryLockWaitersAsync(
+        int blockerPid,
+        int expectedWaiters,
+        CancellationToken cancellationToken)
+    {
+        var started = Stopwatch.GetTimestamp();
+        while (Stopwatch.GetElapsedTime(started) < TimeSpan.FromSeconds(10))
+        {
+            await using var command = database.DataSource.CreateCommand("""
+                select count(*)::integer
+                from pg_locks blocker
+                join pg_locks waiter
+                  on waiter.locktype = blocker.locktype
+                 and waiter.database = blocker.database
+                 and waiter.classid = blocker.classid
+                 and waiter.objid = blocker.objid
+                 and waiter.objsubid = blocker.objsubid
+                where blocker.pid = $1
+                  and blocker.locktype = 'advisory'
+                  and blocker.granted
+                  and not waiter.granted
+                """);
+            command.Parameters.AddWithValue(blockerPid);
+            if (Convert.ToInt32(
+                    await command.ExecuteScalarAsync(cancellationToken),
+                    System.Globalization.CultureInfo.InvariantCulture) >= expectedWaiters)
+            {
+                return;
+            }
+
+            await Task.Delay(25, cancellationToken);
+        }
+
+        throw new TimeoutException(
+            $"Expected {expectedWaiters} recurrence transactions to wait on the association advisory lock.");
     }
 
     private static IncidentFingerprint Fingerprint(string title)
@@ -299,6 +412,24 @@ public sealed class PostgresFingerprintingTests(PostgresFixture database) : IAsy
         var features = new FingerprintFeatures(
             "payments", "payments-production", ["production"], title,
             title.Split(' ', StringSplitOptions.RemoveEmptyEntries), ["error"], [title], ["checkout"], ["payments:src/provider.cs"]);
+        return new FingerprintGenerator().Generate(features, FingerprintStage.Final);
+    }
+
+    private static IncidentFingerprint SimilarFingerprint(bool includeAdditionalError)
+    {
+        var errors = includeAdditionalError
+            ? new[] { "shared timeout", "downstream retry exhausted" }
+            : ["shared timeout"];
+        var features = new FingerprintFeatures(
+            "payments",
+            "payments-production",
+            ["production"],
+            "checkout provider timeout",
+            ["checkout", "provider", "timeout"],
+            ["error"],
+            errors,
+            ["checkout"],
+            ["payments:src/provider.cs"]);
         return new FingerprintGenerator().Generate(features, FingerprintStage.Final);
     }
 

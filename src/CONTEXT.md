@@ -21,6 +21,10 @@ PagerDuty state and investigation status are different concepts:
 
 An incident may become **frozen** when resolved. Frozen incidents preserve their final responder-facing report while the durable workflow finishes any required finalization.
 
+### Incident intake
+
+The acceptance of a PagerDuty event or incident snapshot into IncidentBot. Incident intake selects the investigation profile, retains only profile-approved labels, and schedules idempotent investigation work; transport validation and PagerDuty retrieval occur before intake.
+
 ### Investigation
 
 The durable workflow that turns an incident into an investigation report. It resolves an investigation profile, evaluates recurrence, collects evidence, performs AI synthesis, composes a report, persists it, and publishes versioned updates.
@@ -58,6 +62,8 @@ An adapter that collects evidence from one evidence source. A connector may use 
 
 Kafka v1 is an explicit exception to transport variability: it is API-only and reads reviewed metric packs through Grafana `/api/ds/query`. It never connects to brokers. Kafka queries are sorted and batched with at most eight targets, use only escaped profile allowlists, and reject returned resource labels outside that scope. Metric packs are shared by runtime collection and deterministic dashboard generation.
 
+A **Kafka metric plan** is the immutable, profile-scoped resolution of one reviewed metric pack. It carries the safe runtime and dashboard queries, effective thresholds, and expected resource-label scope used by both evidence collection and deterministic dashboard generation; every data selector carries all resource scopes applicable to its metric.
+
 GitLab pipeline collection treats a pipeline as a parent evidence group. Current failed jobs are queried before canceled fanout, hard failed non-allowed job families outrank allowed failures and aggregated downstream cancellations, retries are collapsed without reviving recovered jobs, and trace budgets are shared fairly across selected job families. The earliest hard failure carries a structured ordinal so an upstream failure remains ahead of a closer cascading sibling.
 
 MCP output must prove membership in the profile's allowed resource scope using source-specific structured provenance (for example GitLab project and pipeline, or Nomad namespace and job). Same-host but out-of-scope findings are rejected. Responder URLs are deny-by-default without a trusted root and are retained only when they also match an allowed resource.
@@ -86,6 +92,14 @@ The versioned responder-facing projection of an investigation. It contains deter
 
 The report is the primary wire contract shared by the API, web client, Slack publishing, persistence, and demo mode. Contract changes must remain backwards-compatible with older persisted reports unless an explicit migration is provided.
 
+### Investigation report transition
+
+A committed move from one investigation report version to the next. Persistence establishes the monotonically increasing version before the matching live update is published; a stale transition must fail rather than replace a newer report.
+
+### Live investigation session
+
+The web client's version-monotonic view of one investigation report across initial retrieval, live updates, reconnects, and polling fallback. A stale or out-of-order response cannot replace a newer report, and failed live reconnection restores polling.
+
 ### AI synthesis
 
 A required, evidence-grounded interpretation attempted from a bounded digest of collected evidence. LiteLLM failure is represented explicitly and must not suppress the deterministic report. It may summarize evidence, rank supported diagnoses, record unknowns, and recommend verification checks.
@@ -111,6 +125,8 @@ The process of comparing an incident fingerprint with historical candidates and 
 
 Recurrence failure must not prevent the main investigation report from being saved. The report records recurrence as unavailable with a bounded diagnostic.
 
+Concurrent association decisions within one fingerprint algorithm, service, and profile must be equivalent to some serial ordering of the same decisions.
+
 ### Problem group
 
 A persistent grouping of recurring incidents that share a deterministic failure identity. A problem group has a human-readable problem key, algorithm version, representative fingerprint, occurrence history, and lifecycle state.
@@ -129,9 +145,15 @@ Persisted publication work, currently used for Slack report updates. Report pers
 
 A durable intent to refresh an incident's single Slack message from the latest committed investigation report. Delivery is at-least-once: a returned Slack timestamp confirms creation and identifies repeatable updates, while an initial post whose response is lost may be retried. A delayed stuck check applies only while its originating report version remains current and collecting.
 
+### Slack prompt admission
+
+The bounded decision that an eligible Slack app mention may enter the prompt-investigation queue. Admission owns mention eligibility, normalization, duplicate suppression, rate limits, and overload outcome; Socket Mode acknowledgement remains transport work.
+
 ### Demo mode
 
 A self-contained adapter used to demonstrate the live report experience without PostgreSQL, external evidence systems, or recurrence persistence. Demo reports should remain representative of production contracts and responder concepts rather than define separate product behavior.
+
+A **Demo replay** is one generation of staged investigation report transitions in Demo mode. A reset starts a newer generation, and transitions from an older generation cannot overwrite it.
 
 ## System invariants
 
@@ -162,12 +184,19 @@ A self-contained adapter used to demonstrate the live report experience without 
 ## Established architecture seams
 
 - `IncidentProgression` owns investigation status names and responder-visible progression decisions while persisted reports retain backwards-compatible string values.
+- `IIncidentIntake` is the shared Incident intake interface for PagerDuty adapters; it owns profile selection, safe-label filtering, and durable acceptance ordering.
 - `EvidenceSourceRegistry` owns the six-source roster, application transport lookup, connector registration, and profile-enabled source selection. Source-specific collection remains with its adapters; profile models own only resource scope.
+- `ConnectorResponseBudget` owns fair cumulative response allocation, bounded reads, overflow classification, disposal, and diagnostics for native connector adapters.
+- `KafkaMetricPlan` is the immutable compiled interface shared by Kafka runtime collection, dashboard generation, and onboarding validation.
 - `EvidenceRankingPolicy` owns responder-facing evidence relevance, grouping, source diversity, and deterministic ordering. Report, AI, Slack, and connector truncation must use this shared policy rather than treating severity as presentation priority.
+- `InvestigationReportTransitions` owns versioned report persistence, status transitions, changed-section metadata, and matching live publication.
 - `IRecurrenceCoordinator` is the investigation workflow's recurrence interface. It owns provisional/final orchestration and unavailable-state mapping; the runner does not coordinate fingerprint construction and matching directly.
 - `RecurrencePolicy` owns candidate ranking, association thresholds, problem keys, time cutoffs, and lifecycle classification. PostgreSQL persistence owns locking and storage.
 - `IIncidentStore` is the domain-facing incident persistence interface. Intake, investigation, Slack, retention, and report reading do not depend on the PostgreSQL implementation.
 - `IncidentBot.Contracts` is the authoritative report wire contract. OpenAPI generation and generated TypeScript types keep the client representation aligned.
+- `liveInvestigationSession.ts` owns the client's version-monotonic report state, live join and reconnect behavior, polling fallback, request ordering, and cleanup behind a browser adapter.
+- `SlackPromptAdmission` owns Slack mention eligibility, normalization, duplicate suppression, rate budgets, and bounded queue outcomes while the Socket Mode adapter retains acknowledgement and transport work.
+- `DemoReplay` owns Demo reset generations, staged phase transitions, changed-section metadata, and ordered live publication behind the HTTP, PagerDuty, and hosted-worker adapters.
 - Client modules are organized by feature. `App.tsx` only selects the landing or incident feature; the incident page owns live-session orchestration, while report modules own responder-concept derivation and rendering for recurrence, evidence review, and analysis.
 
 ## Remaining architectural friction

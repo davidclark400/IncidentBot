@@ -15,21 +15,17 @@ namespace IncidentBot.Api.Tests;
 public sealed class SlackMentionTransportTests
 {
     [Fact]
-    public void OfficialAppMentionEnvelopeBecomesOneBoundedPrompt()
+    public async Task EligibleEnvelopeIsNormalizedAndQueued()
     {
-        using var document = JsonDocument.Parse(Envelope(
+        var admission = Admission();
+
+        var result = Admit(admission, Envelope(
             text: "<@UBOT> show <@UOTHER> latency &amp; errors &lt; 1s",
             threadTimestamp: "1710000000.000001"));
+        var mention = await ReadAcceptedAsync(admission);
 
-        var accepted = SlackMentionParser.TryParseEventsApiEnvelope(
-            document.RootElement,
-            new SlackBotIdentity("T123", "UBOT"),
-            2000,
-            allowExternalSharedChannels: false,
-            out var mention);
-
-        Assert.True(accepted);
-        Assert.NotNull(mention);
+        Assert.Equal(SlackPromptAdmissionOutcome.Accepted, result.Outcome);
+        Assert.Null(result.BusyMention);
         Assert.Equal("Ev123", mention.EventId);
         Assert.Equal("C123", mention.ChannelId);
         Assert.Equal("1710000000.000001", mention.ThreadTimestamp);
@@ -37,45 +33,90 @@ public sealed class SlackMentionTransportTests
     }
 
     [Fact]
-    public void MentionParserRejectsWrongWorkspaceExternalBotSelfAndOversizedEvents()
+    public async Task DuplicateEventsAreDroppedAndOldEntriesAreEvictedAtTheFiniteCapacity()
     {
-        Assert.False(Parse(Envelope(), new SlackBotIdentity("T999", "UBOT"), 2000));
-        Assert.False(Parse(Envelope(payloadExtra: ",\"is_ext_shared_channel\":true"),
-            new SlackBotIdentity("T123", "UBOT"), 2000));
-        Assert.False(Parse(Envelope(eventExtra: ",\"bot_id\":\"B123\""),
-            new SlackBotIdentity("T123", "UBOT"), 2000));
-        Assert.False(Parse(Envelope(user: "UBOT"), new SlackBotIdentity("T123", "UBOT"), 2000));
-        Assert.False(Parse(Envelope(text: "<@UBOT> too long"),
-            new SlackBotIdentity("T123", "UBOT"), 3));
+        var admission = Admission(queueCapacity: 1, perUserRateLimit: 60, globalRateLimit: 600);
+        var first = Envelope(eventId: "event-0", user: "U0");
+
+        Assert.Equal(SlackPromptAdmissionOutcome.Accepted, Admit(admission, first).Outcome);
+        await ReadAcceptedAsync(admission);
+        Assert.Equal(SlackPromptAdmissionOutcome.Dropped, Admit(admission, first).Outcome);
+
+        for (var index = 1; index <= 64; index++)
+        {
+            Assert.Equal(
+                SlackPromptAdmissionOutcome.Accepted,
+                Admit(admission, Envelope(eventId: $"event-{index}", user: $"U{index}")).Outcome);
+            await ReadAcceptedAsync(admission);
+        }
+
+        Assert.Equal(SlackPromptAdmissionOutcome.Accepted, Admit(admission, first).Outcome);
+        await ReadAcceptedAsync(admission);
     }
 
     [Fact]
-    public void EventDedupeIsFiniteAndRejectsRecentDuplicates()
+    public async Task UnauthorizedMalformedExternalBotSelfAndOversizedEventsAreDropped()
     {
-        var dedupe = new SlackEventDedupe(2);
+        var admission = Admission(maximumPromptCharacters: 3);
 
-        Assert.True(dedupe.TryRemember("event-1"));
-        Assert.False(dedupe.TryRemember("event-1"));
-        Assert.True(dedupe.TryRemember("event-2"));
-        Assert.True(dedupe.TryRemember("event-3"));
-        Assert.Equal(2, dedupe.Count);
-        Assert.True(dedupe.TryRemember("event-1"));
+        Assert.Equal(SlackPromptAdmissionOutcome.Dropped,
+            Admit(admission, Envelope(), new SlackBotIdentity("T999", "UBOT")).Outcome);
+        Assert.Equal(SlackPromptAdmissionOutcome.Dropped,
+            Admit(admission, Envelope(payloadExtra: ",\"is_ext_shared_channel\":true")).Outcome);
+        Assert.Equal(SlackPromptAdmissionOutcome.Dropped,
+            Admit(admission, Envelope(eventExtra: ",\"bot_id\":\"B123\"")).Outcome);
+        Assert.Equal(SlackPromptAdmissionOutcome.Dropped,
+            Admit(admission, Envelope(user: "UBOT")).Outcome);
+        Assert.Equal(SlackPromptAdmissionOutcome.Dropped,
+            Admit(admission, Envelope(text: "<@UBOT> too long")).Outcome);
+        Assert.Equal(SlackPromptAdmissionOutcome.Dropped,
+            Admit(admission, """{ "type": "events_api", "payload": {} }""").Outcome);
+
+        var externalAdmission = Admission(allowExternalSharedChannels: true);
+        Assert.Equal(
+            SlackPromptAdmissionOutcome.Accepted,
+            Admit(externalAdmission, Envelope(
+                payloadExtra: ",\"is_ext_shared_channel\":true")).Outcome);
+        await ReadAcceptedAsync(externalAdmission);
     }
 
     [Fact]
-    public void PromptRateLimiterEnforcesPerUserAndGlobalMinuteBudgets()
+    public async Task PerUserAndGlobalRateRejectionsReturnBusyAndBudgetsResetAfterOneMinute()
     {
         var time = new MutableTimeProvider(DateTimeOffset.Parse("2026-07-13T10:00:00Z"));
-        var limiter = new SlackPromptRateLimiter(2, 3, time);
+        var admission = Admission(
+            queueCapacity: 4,
+            perUserRateLimit: 2,
+            globalRateLimit: 3,
+            timeProvider: time);
 
-        Assert.True(limiter.TryAcquire("T1", "C1", "U1"));
-        Assert.True(limiter.TryAcquire("T1", "C1", "U1"));
-        Assert.False(limiter.TryAcquire("T1", "C1", "U1"));
-        Assert.True(limiter.TryAcquire("T1", "C1", "U2"));
-        Assert.False(limiter.TryAcquire("T1", "C1", "U3"));
+        await AssertAcceptedAsync(admission, Envelope(eventId: "event-1", user: "U1"));
+        await AssertAcceptedAsync(admission, Envelope(eventId: "event-2", user: "U1"));
+        var perUserBusy = Admit(admission, Envelope(eventId: "event-3", user: "U1"));
+        Assert.Equal(SlackPromptAdmissionOutcome.Busy, perUserBusy.Outcome);
+        Assert.Equal("event-3", perUserBusy.BusyMention!.EventId);
+
+        await AssertAcceptedAsync(admission, Envelope(eventId: "event-4", user: "U2"));
+        var globalBusy = Admit(admission, Envelope(eventId: "event-5", user: "U3"));
+        Assert.Equal(SlackPromptAdmissionOutcome.Busy, globalBusy.Outcome);
+        Assert.Equal("event-5", globalBusy.BusyMention!.EventId);
 
         time.Advance(TimeSpan.FromMinutes(1));
-        Assert.True(limiter.TryAcquire("T1", "C1", "U1"));
+        await AssertAcceptedAsync(admission, Envelope(eventId: "event-6", user: "U1"));
+    }
+
+    [Fact]
+    public void FullAcceptedQueueReturnsBusyWithoutBlockingTheCaller()
+    {
+        var admission = Admission(queueCapacity: 1);
+
+        Assert.Equal(
+            SlackPromptAdmissionOutcome.Accepted,
+            Admit(admission, Envelope(eventId: "event-1")).Outcome);
+        var busy = Admit(admission, Envelope(eventId: "event-2", user: "U2"));
+
+        Assert.Equal(SlackPromptAdmissionOutcome.Busy, busy.Outcome);
+        Assert.Equal("event-2", busy.BusyMention!.EventId);
     }
 
     [Fact]
@@ -113,18 +154,53 @@ public sealed class SlackMentionTransportTests
         Assert.False(root.GetProperty("unfurl_media").GetBoolean());
     }
 
-    private static bool Parse(string json, SlackBotIdentity identity, int maximumPromptCharacters)
+    private static SlackPromptAdmission Admission(
+        int queueCapacity = 8,
+        int perUserRateLimit = 6,
+        int globalRateLimit = 30,
+        int maximumPromptCharacters = 2000,
+        bool allowExternalSharedChannels = false,
+        TimeProvider? timeProvider = null) => new(
+        new SlackOptions
+        {
+            MaximumPromptCharacters = maximumPromptCharacters,
+            PromptQueueCapacity = queueCapacity,
+            PromptWorkerCount = 1,
+            PromptRequestsPerMinutePerUser = perUserRateLimit,
+            PromptRequestsPerMinute = globalRateLimit,
+            AllowExternalSharedChannels = allowExternalSharedChannels
+        },
+        timeProvider ?? TimeProvider.System);
+
+    private static SlackPromptAdmissionResult Admit(
+        SlackPromptAdmission admission,
+        string json,
+        SlackBotIdentity? identity = null)
     {
         using var document = JsonDocument.Parse(json);
-        return SlackMentionParser.TryParseEventsApiEnvelope(
+        return admission.Admit(
             document.RootElement,
-            identity,
-            maximumPromptCharacters,
-            allowExternalSharedChannels: false,
-            out _);
+            identity ?? new SlackBotIdentity("T123", "UBOT"));
+    }
+
+    private static async Task AssertAcceptedAsync(
+        SlackPromptAdmission admission,
+        string envelope)
+    {
+        Assert.Equal(SlackPromptAdmissionOutcome.Accepted, Admit(admission, envelope).Outcome);
+        await ReadAcceptedAsync(admission);
+    }
+
+    private static async Task<SlackMention> ReadAcceptedAsync(SlackPromptAdmission admission)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        await using var reader = admission.ReadAllAsync(timeout.Token).GetAsyncEnumerator();
+        Assert.True(await reader.MoveNextAsync());
+        return reader.Current;
     }
 
     private static string Envelope(
+        string eventId = "Ev123",
         string text = "<@UBOT> investigate payments",
         string user = "U123",
         string? threadTimestamp = null,
@@ -136,7 +212,7 @@ public sealed class SlackMentionTransportTests
           "payload": {
             "type": "event_callback",
             "team_id": "T123",
-            "event_id": "Ev123"{{payloadExtra}},
+            "event_id": "{{eventId}}"{{payloadExtra}},
             "event": {
               "type": "app_mention",
               "user": "{{user}}",

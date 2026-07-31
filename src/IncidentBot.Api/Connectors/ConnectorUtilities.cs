@@ -113,7 +113,7 @@ internal static class ConnectorUtilities
             // Conservatively exhaust a caller's shared allowance even when the declared
             // response is rejected before its body is downloaded.
             observeBytesRead?.Invoke(maxBytes);
-            throw new InvalidOperationException("Connector response exceeded its configured byte limit.");
+            throw new ConnectorResponseLimitExceededException();
         }
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
         using var buffer = new MemoryStream();
@@ -128,7 +128,7 @@ internal static class ConnectorUtilities
             observeBytesRead?.Invoke(count);
             if (buffer.Length + count > maxBytes)
             {
-                throw new InvalidOperationException("Connector response exceeded its configured byte limit.");
+                throw new ConnectorResponseLimitExceededException();
             }
             await buffer.WriteAsync(bytes.AsMemory(0, count), ct);
         }
@@ -147,7 +147,7 @@ internal static class ConnectorUtilities
         if (response.Content.Headers.ContentLength is { } contentLength && contentLength > maxBytes)
         {
             observeBytesRead?.Invoke(maxBytes);
-            throw new InvalidOperationException("Connector response exceeded its configured byte limit.");
+            throw new ConnectorResponseLimitExceededException();
         }
 
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
@@ -161,7 +161,7 @@ internal static class ConnectorUtilities
             observeBytesRead?.Invoke(count);
             if (buffer.Length + count > maxBytes)
             {
-                throw new InvalidOperationException("Connector response exceeded its configured byte limit.");
+                throw new ConnectorResponseLimitExceededException();
             }
 
             await buffer.WriteAsync(bytes.AsMemory(0, count), ct);
@@ -183,9 +183,6 @@ internal static class ConnectorUtilities
 
         return encoding.GetString(buffer.ToArray());
     }
-
-    public static bool IsByteLimitException(InvalidOperationException exception) =>
-        exception.Message.Contains("configured byte limit", StringComparison.Ordinal);
 
     public static string? CombineDiagnostics(params string?[] diagnostics)
     {
@@ -224,3 +221,6 @@ internal static class ConnectorUtilities
         }
     }
 }
+
+internal sealed class ConnectorResponseLimitExceededException()
+    : InvalidOperationException("Connector response exceeded its configured byte limit.");

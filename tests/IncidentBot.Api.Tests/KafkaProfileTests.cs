@@ -34,6 +34,36 @@ public sealed class KafkaProfileTests
             source => source.Source == EvidenceSourceRegistry.Kafka);
     }
 
+    [Fact]
+    public void MetricPlanStoreReusesEquivalentScopesAndKeepsPlansImmutable()
+    {
+        var plans = new KafkaMetricPlanStore(KafkaMetricCatalog.Load(
+            Path.Combine(AppContext.BaseDirectory, "config", "kafka-metric-packs.yaml")));
+        var firstScope = new KafkaProfileScope
+        {
+            MetricPackId = "synthetic-fixture-kafka-v1",
+            Cluster = "prod",
+            Topics = ["payments", "orders"],
+            ConsumerGroups = ["workers"]
+        };
+        var equivalentScope = new KafkaProfileScope
+        {
+            MetricPackId = firstScope.MetricPackId,
+            Cluster = firstScope.Cluster,
+            Topics = ["orders", "payments"],
+            ConsumerGroups = ["workers"]
+        };
+
+        var first = plans.Resolve(firstScope);
+        var equivalent = plans.Resolve(equivalentScope);
+        firstScope.Topics[0] = "mutated";
+        var changed = plans.Resolve(firstScope);
+
+        Assert.Same(first, equivalent);
+        Assert.NotSame(first, changed);
+        Assert.Equal(new[] { "orders", "payments" }, first.Topics.ToArray());
+    }
+
     [Theory]
     [InlineData("topics: []", "at least one")]
     [InlineData("topics: [orders]\n  thresholdOverrides:\n    unknown-metric:\n      warning: 1", "not defined")]
@@ -60,7 +90,7 @@ public sealed class KafkaProfileTests
         }),
         new TestEnvironment(),
         new EvidenceSourceRegistry(Array.Empty<IIncidentEvidenceConnector>(), TestConfiguration.EvidenceSources()),
-        new KafkaMetricPackStore(KafkaMetricCatalog.Load(
+        new KafkaMetricPlanStore(KafkaMetricCatalog.Load(
             Path.Combine(AppContext.BaseDirectory, "config", "kafka-metric-packs.yaml"))));
 
     private static TemporaryProfile ProfileFile(string kafkaYaml)

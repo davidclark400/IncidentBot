@@ -164,7 +164,6 @@ public static class RecurrenceRegistration
         services.AddSingleton<FingerprintNormalizer>();
         services.AddSingleton<FingerprintExtractor>();
         services.AddSingleton<FingerprintGenerator>();
-        services.AddSingleton<FingerprintMatcher>();
         services.AddSingleton<RecurrencePolicy>();
         services.AddSingleton<ProblemRepository>();
         services.AddSingleton<IProblemRepository>(provider => provider.GetRequiredService<ProblemRepository>());
