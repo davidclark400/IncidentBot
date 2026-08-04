@@ -1,0 +1,89 @@
+version: 3
+revision: "2026-08-03.3"
+fallbackSlackChannel: "C0000000000"
+
+recipes:
+  - id: payments-production
+    pagerDutyServiceId: P123PAYMENTS
+    team: payments
+    serviceCollection: payments-platform
+    slackChannel: "C0123456789"
+    slackPromptLabels:
+      service: payments-api
+      environment: production
+    pagerDuty: {}
+    agentCases:
+      enabled: true
+      publishToSlack: false
+      allowSourceRefresh: true
+      allowedInputCategories:
+        - deployment
+        - merge-request-created
+        - merge-request-merged
+        - pipeline
+        - workload-failure
+        - first-error
+        - error
+        - metric
+        - note
+
+    nomad:
+      region: global
+      namespaces:
+        - name: payments-production
+          jobs:
+            - payments-api
+            - payments-worker
+
+    consul:
+      datacenter: primary
+      services:
+        - name: payments-api
+        - name: payments-worker
+
+    gitLab:
+      projects:
+        - id: platform/payments
+          branch: main
+          environments:
+            - production
+          relevantPaths:
+            - src/Payments.Api
+            - deploy/nomad
+
+    observability:
+      metricPackId: example-prometheus-http-v1
+      service: payments-api
+      environment: production
+
+    grafana:
+      organizationId: 1
+      annotationTags:
+        - payments
+        - production
+      dashboards:
+        - uid: payments-overview
+          panelIds: [2, 7, 12]
+
+    victoriaLogs:
+      accountId: "1"
+      projectId: "20"
+      streamFilters:
+        namespace: payments-production
+        service: payments-api
+      fields: [_time, level, service, allocation_id, _msg]
+      queries:
+        - name: Errors
+          expression: 'level:in(error, fatal) service:="payments-api"'
+          anchorPatterns:
+            - name: Payment authorisation timeout
+              pattern: '(?i)payment authori[sz]ation (?:timed out|exceeded [0-9]+ms)'
+            - name: Downstream connection reset
+              pattern: '(?i)connection (?:reset|refused)'
+        - name: Panics and timeouts
+          expression: 'service:="payments-api" (panic OR timeout)'
+          anchorPatterns:
+            - name: Process panic
+              pattern: '(?i)(?:panic|unhandled exception)'
+      redactPatterns:
+        - '(?i)(authorization|token|password)[=: ]+[^ ,}]+'

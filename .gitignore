@@ -483,7 +483,7 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 
-# IncidentBot local deployment configuration
+# Panko local deployment configuration
 # Keep real credentials and infrastructure topology out of the repository.
 .env.*
 !.env.example
@@ -511,4 +511,4 @@ TestResults/
 .DS_Store
 
 # Unused Vite starter asset retained only in local workspaces
-src/IncidentBot.Client/src/assets/hero.png
+src/Panko.Client/src/assets/hero.png

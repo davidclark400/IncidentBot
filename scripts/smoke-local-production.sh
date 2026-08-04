@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-project="incidentbot-smoke"
+project="panko-smoke"
 compose=(docker compose --project-name "$project" --file "$root/compose.smoke.yaml")
 
 cleanup() {

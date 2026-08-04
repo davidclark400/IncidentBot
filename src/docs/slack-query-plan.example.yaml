@@ -1,5 +1,5 @@
 version: 1
-profileId: payments-production
+recipeId: payments-production
 question: Are payment timeouts rising in production after the latest deploy?
 labels:
   environment: production

@@ -3,7 +3,7 @@ set -euo pipefail
 
 base_url="${1:-http://127.0.0.1:5080}"
 service_id="${2:-PSMOKE}"
-identity="${SMOKE_IDENTITY:-incidentbot-smoke@local}"
+access_token="${SMOKE_BEARER_TOKEN:-}"
 : "${PAGERDUTY_WEBHOOK_SECRET:?Set PAGERDUTY_WEBHOOK_SECRET before running the smoke test}"
 
 if [[ ! "$service_id" =~ ^[A-Za-z0-9._:-]+$ ]]; then
@@ -14,8 +14,8 @@ fi
 payload_file="$(mktemp)"
 response_file="$(mktemp)"
 health_file="$(mktemp)"
-report_file="$(mktemp)"
-trap 'rm -f "$payload_file" "$response_file" "$health_file" "$report_file"' EXIT
+case_file_response="$(mktemp)"
+trap 'rm -f "$payload_file" "$response_file" "$health_file" "$case_file_response"' EXIT
 
 stamp="$(date -u +%Y%m%d%H%M%S)-$$"
 event_id="evt-smoke-$stamp"
@@ -26,22 +26,22 @@ import datetime
 import json
 import sys
 
-path, event_id, incident_id, service_id = sys.argv[1:]
+path, event_id, pagerduty_incident_id, service_id = sys.argv[1:]
 payload = {
     "event": {
         "id": event_id,
         "event_type": "incident.triggered",
         "occurred_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
         "data": {
-            "id": incident_id,
+            "id": pagerduty_incident_id,
             "type": "incident",
-            "title": "Incident Bot signed webhook smoke test",
+            "title": "Panko signed webhook smoke test",
             "urgency": "low",
-            "html_url": f"https://pagerduty.invalid/incidents/{incident_id}",
+            "html_url": f"https://pagerduty.invalid/incidents/{pagerduty_incident_id}",
             "service": {"id": service_id},
             "custom_details": {
                 "environment": "smoke",
-                "component": "incidentbot",
+                "component": "panko",
                 "diagnostic_noise": "must not be persisted",
                 "auth_token": "must not be persisted"
             }
@@ -92,7 +92,7 @@ if [[ "$webhook_code" != "202" ]]; then
   exit 1
 fi
 
-incident_id="$(python3 - "$response_file" <<'PY'
+case_id="$(python3 - "$response_file" <<'PY'
 import json
 import sys
 
@@ -101,12 +101,29 @@ with open(sys.argv[1], encoding="utf-8") as source:
 PY
 )"
 
+if [[ -z "$access_token" ]]; then
+  case_file_code="$(curl --silent --show-error --output "$case_file_response" --write-out '%{http_code}' \
+    --header 'X-Forwarded-User: forged-smoke-identity' \
+    "$base_url/api/cases/$case_id")"
+  if [[ "$case_file_code" != "401" ]]; then
+    echo "Unsigned identity-header spoof was not rejected (HTTP $case_file_code):" >&2
+    cat "$case_file_response" >&2
+    exit 1
+  fi
+
+  echo "Signed production webhook smoke passed"
+  echo "Unsigned identity header rejected"
+  echo "Case ID: $case_id"
+  echo "Set SMOKE_BEARER_TOKEN to poll the protected Case File"
+  exit 0
+fi
+
 for _ in $(seq 1 30); do
-  report_code="$(curl --silent --show-error --output "$report_file" --write-out '%{http_code}' \
-    --header "X-Forwarded-User: $identity" \
-    "$base_url/api/incidents/$incident_id")"
-  if [[ "$report_code" == "200" ]]; then
-    report_status="$(python3 - "$report_file" <<'PY'
+  case_file_code="$(curl --silent --show-error --output "$case_file_response" --write-out '%{http_code}' \
+    --header "Authorization: Bearer $access_token" \
+    "$base_url/api/cases/$case_id")"
+  if [[ "$case_file_code" == "200" ]]; then
+    case_file_status="$(python3 - "$case_file_response" <<'PY'
 import json
 import sys
 
@@ -114,20 +131,20 @@ with open(sys.argv[1], encoding="utf-8") as source:
     print(json.load(source).get("status", "unknown"))
 PY
 )"
-    if [[ "$report_status" == "ready" || "$report_status" == "degraded" || "$report_status" == "resolved" ]]; then
+    if [[ "$case_file_status" == "ready" || "$case_file_status" == "degraded" || "$case_file_status" == "resolved" ]]; then
       echo "Signed production webhook smoke passed"
-      echo "Incident ID: $incident_id"
-      echo "Report: $base_url/incidents/$incident_id"
+      echo "Case ID: $case_id"
+      echo "Case File: $base_url/cases/$case_id"
       exit 0
     fi
-  elif [[ "$report_code" != "202" ]]; then
-    echo "Report lookup failed with HTTP $report_code:" >&2
-    cat "$report_file" >&2
+  elif [[ "$case_file_code" != "202" ]]; then
+    echo "Case File lookup failed with HTTP $case_file_code:" >&2
+    cat "$case_file_response" >&2
     exit 1
   fi
   sleep 1
 done
 
-echo "Incident $incident_id did not reach a terminal report state within 30 seconds" >&2
-cat "$report_file" >&2
+echo "Case $case_id did not reach a terminal Case File state within 30 seconds" >&2
+cat "$case_file_response" >&2
 exit 1

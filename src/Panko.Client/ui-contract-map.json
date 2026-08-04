@@ -1,0 +1,1049 @@
+{
+  "version": 1,
+  "openApi": "./openapi/panko-openapi.json",
+  "schemas": [
+    {
+      "schema": "CaseFile",
+      "contractHash": "sha256:3dd0e51e965594f2397a478c0a548cc5ba1d241d9940883ea150225a6e942d0e",
+      "consumers": [
+        {
+          "name": "CaseFile",
+          "file": "src/features/cases/CaseFile.tsx",
+          "fields": [
+            "ai",
+            "causalMarkers",
+            "crumbs",
+            "caseId",
+            "links",
+            "pattern",
+            "trail"
+          ]
+        },
+        {
+          "name": "CaseFileHeader",
+          "file": "src/features/cases/CaseFileHeader.tsx",
+          "fields": [
+            "createdBy",
+            "inputVersion",
+            "origin",
+            "pagerDutyIncidentId",
+            "recipeId",
+            "recipeRevision",
+            "projectedInputVersion",
+            "serviceId",
+            "pagerDutyState",
+            "title",
+            "openedAt",
+            "urgency"
+          ]
+        },
+        {
+          "name": "SummaryAndCoverage",
+          "file": "src/case-file/CaseAnalysisSections.tsx",
+          "fields": [
+            "deterministicSummary",
+            "crumbSources"
+          ]
+        },
+        {
+          "name": "CaseFileAppHeader",
+          "file": "src/features/cases/CaseFileAppHeader.tsx",
+          "fields": [
+            "caseFileVersion"
+          ]
+        },
+        {
+          "name": "useCase",
+          "file": "src/features/cases/useCase.ts",
+          "fields": [
+            "inputVersion",
+            "projectedInputVersion",
+            "status",
+            "caseFileVersion"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "updatedAt": "The UI displays the Case File version instead of the raw update timestamp."
+      }
+    },
+    {
+      "schema": "CasePending",
+      "contractHash": "sha256:7ea50924484a82e66d890aa7f9f5fa833b00a744d270017753a365878b3b9774",
+      "consumers": [
+        {
+          "name": "useCase",
+          "file": "src/features/cases/useCase.ts",
+          "fields": [
+            "inputVersion",
+            "projectedInputVersion",
+            "status",
+            "caseFileVersion"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "caseId": "Pending responses are not rendered.",
+        "pagerDutyIncidentId": "Pending responses are not rendered.",
+        "recipeId": "Pending responses are not rendered.",
+        "origin": "Pending responses are not rendered.",
+        "createdBy": "Pending responses are not rendered.",
+        "serviceId": "Pending responses are not rendered.",
+        "pagerDutyState": "Pending responses are not rendered.",
+        "title": "Pending responses are not rendered.",
+        "openedAt": "Pending responses are not rendered.",
+        "updatedAt": "Pending responses are not rendered.",
+        "urgency": "Pending responses are not rendered."
+      }
+    },
+    {
+      "schema": "CaseOrigin",
+      "contractHash": "sha256:93cbfd9c373aeedf5a8c1df8068ddd56b175c20a6edfaa2e59c60dd3b2285e40",
+      "consumers": [
+        {
+          "name": "CaseFileHeader",
+          "file": "src/features/cases/CaseFileHeader.tsx",
+          "fields": [
+            "kind"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "externalId": "The Case origin ID is not rendered; the header uses the qualified PagerDuty incident ID when present."
+      }
+    },
+    {
+      "schema": "CaseOriginKind",
+      "contractHash": "sha256:d9b0901f014bd3cc5fbaf7701d1c1b26499d8cecb7824bfa1aca71d60093b871",
+      "consumers": [
+        {
+          "name": "CaseFileHeader",
+          "file": "src/features/cases/CaseFileHeader.tsx",
+          "fields": []
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "AiSynthesis",
+      "contractHash": "sha256:2fb4c941de8b706ae304b15965378f039b349d68b7676b601e8af12a3db5cc2f",
+      "consumers": [
+        {
+          "name": "CaseFile",
+          "file": "src/features/cases/CaseFile.tsx",
+          "fields": [
+            "diagnoses",
+            "recommendedChecks"
+          ]
+        },
+        {
+          "name": "SummaryAndCoverage",
+          "file": "src/case-file/CaseAnalysisSections.tsx",
+          "fields": [
+            "status"
+          ]
+        },
+        {
+          "name": "InlineSummary",
+          "file": "src/case-file/CaseAnalysisSections.tsx",
+          "fields": [
+            "summary",
+            "summaryParts",
+            "summaryReferences"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "crumbHash": "Internal synthesis trace metadata is not presented.",
+        "possibleContributors": "The cited diagnoses section is the responder-facing contributor view.",
+        "unknowns": "Unknowns are retained in the API but not currently presented."
+      }
+    },
+    {
+      "schema": "AiDiagnosis",
+      "contractHash": "sha256:bfb563121154f8a0d5627497250103eb13eacda0d4ea6aa950ac741366ba48d8",
+      "consumers": [
+        {
+          "name": "CitedDiagnosis",
+          "file": "src/case-file/CaseAnalysisSections.tsx",
+          "fields": [
+            "codeReferences",
+            "crumbIds",
+            "crumbStrength",
+            "rank",
+            "summary"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "AiSummaryPart",
+      "contractHash": "sha256:0fd1a3a95f3ac8ff058d3b6588c9bb3cfa33dec27450ec92a16d8c13ccd35f15",
+      "consumers": [
+        {
+          "name": "InlineSummary",
+          "file": "src/case-file/CaseAnalysisSections.tsx",
+          "fields": [
+            "referenceId",
+            "text"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "AiSummaryReference",
+      "contractHash": "sha256:2a8cb22b37f57e7aea4b7af2b43673523c8808e2e63f07f62c35508b38bf8a1f",
+      "consumers": [
+        {
+          "name": "InlineSummary",
+          "file": "src/case-file/CaseAnalysisSections.tsx",
+          "fields": [
+            "href",
+            "id",
+            "kind",
+            "label"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "Crumb",
+      "contractHash": "sha256:5b5b0bc0c0647640842172565f77295a456298539167542762642e3bd1da6c0f",
+      "consumers": [
+        {
+          "name": "LogErrorSection",
+          "file": "src/case-file/CrumbTrailReview.tsx",
+          "fields": [
+            "category",
+            "occurredAt",
+            "source"
+          ]
+        },
+        {
+          "name": "CrumbCard",
+          "file": "src/case-file/CrumbTrailReview.tsx",
+          "fields": [
+            "category",
+            "codeReferences",
+            "confidence",
+            "excerpt",
+            "id",
+            "severity",
+            "source",
+            "summary",
+            "url"
+          ]
+        },
+        {
+          "name": "LogErrorRow",
+          "file": "src/case-file/CrumbTrailReview.tsx",
+          "fields": [
+            "id",
+            "objectId",
+            "occurredAt",
+            "summary",
+            "url"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "actor": "Actor metadata is shown only for causal events.",
+        "endedAt": "The current cards show the Crumb start time only.",
+        "objectType": "The object identifier is sufficient for the log row.",
+        "provenance": "Raw connector provenance is intentionally not exposed in the UI."
+      }
+    },
+    {
+      "schema": "TrailEntry",
+      "contractHash": "sha256:48b0d9b272a5859d6ad0ff3707bbdb2bda012dd79dc5202bd6a459985f2efe4c",
+      "consumers": [
+        {
+          "name": "CrumbTrailReview",
+          "file": "src/case-file/CrumbTrailReview.tsx",
+          "fields": [
+            "kind",
+            "occurredAt",
+            "source",
+            "summary"
+          ]
+        },
+        {
+          "name": "TrailRow",
+          "file": "src/case-file/CrumbTrailReview.tsx",
+          "fields": [
+            "id",
+            "occurredAt",
+            "severity",
+            "source",
+            "summary",
+            "url"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "actor": "Actor details are presented in the causal sequence.",
+        "objectId": "Trail rows intentionally stay compact.",
+        "objectType": "Trail rows intentionally stay compact."
+      }
+    },
+    {
+      "schema": "CrumbSourceStatus",
+      "contractHash": "sha256:f9a1dc12884f43ad422d314337d3adc603e6d074a1f54e9f625f77cd26fa2f6b",
+      "consumers": [
+        {
+          "name": "CrumbSourceRow",
+          "file": "src/case-file/CaseAnalysisSections.tsx",
+          "fields": [
+            "durationMilliseconds",
+            "crumbCount",
+            "health",
+            "requestState",
+            "source"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "diagnostic": "Detailed connector diagnostics are not shown in the compact source row.",
+        "links": "Source links are displayed from the Case File-level curated link list."
+      }
+    },
+    {
+      "schema": "CrumbSourceHealth",
+      "contractHash": "sha256:839baa2b04ede8f1bdbcf13974618a0ff258d6d75199a7f620237be5e134b0ef",
+      "consumers": [
+        {
+          "name": "CrumbSourceRow",
+          "file": "src/case-file/CaseAnalysisSections.tsx",
+          "fields": []
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "CrumbSourceRequestState",
+      "contractHash": "sha256:020ed56c990c9b88b5fe54ad5168b0b96f13f134f89b64505bce0b5c619d44a0",
+      "consumers": [
+        {
+          "name": "CrumbSourceRow",
+          "file": "src/case-file/CaseAnalysisSections.tsx",
+          "fields": []
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "PatternContext",
+      "contractHash": "sha256:95a4bc90e378659576059d48fa7e0b478ca6fee94cd112023358ae7df7fb4d6a",
+      "consumers": [
+        {
+          "name": "PatternPanel",
+          "file": "src/case-file/PatternPanel.tsx",
+          "fields": [
+            "availability",
+            "firstSeen",
+            "lastSeen",
+            "lifecycleState",
+            "matchScore",
+            "matchType",
+            "matchedFeatures",
+            "occurrenceCount",
+            "possibleMatches",
+            "patternKey",
+            "recentOccurrences"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "algorithmVersion": "Signature implementation metadata is not user-facing.",
+        "completeness": "Availability and lifecycle state provide the current UI signal.",
+        "diagnostic": "Unavailable state uses a safe generic message.",
+        "patternId": "The stable Pattern key is displayed instead of the internal GUID.",
+        "stage": "Availability already communicates whether matching is provisional."
+      }
+    },
+    {
+      "schema": "PossiblePatternMatch",
+      "contractHash": "sha256:873f04c1d3709f94286b6b6c490ba4345b8f74423d0bbfbe706b1068ac61ed76",
+      "consumers": [
+        {
+          "name": "RelatedMatches",
+          "file": "src/case-file/PatternPanel.tsx",
+          "fields": [
+            "patternKey",
+            "score"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "lastSeen": "The compact related-match chip shows only identity and score.",
+        "matchedFeatures": "Detailed matching Crumbs are reserved for confirmed Pattern context.",
+        "matchType": "The compact related-match chip shows only identity and score."
+      }
+    },
+    {
+      "schema": "PatternOccurrence",
+      "contractHash": "sha256:59c2bd64907088f7154fff0a2cfda292974ece71ea82bf39d142eca359c02d0a",
+      "consumers": [
+        {
+          "name": "PatternPanel",
+          "file": "src/case-file/PatternPanel.tsx",
+          "fields": [
+            "caseId",
+            "occurredAt",
+            "pagerDutyIncidentId",
+            "caseUrl",
+            "pagerDutyState"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "updatedAt": "Occurrence cards display when the Case occurred."
+      }
+    },
+    {
+      "schema": "CausalMarker",
+      "contractHash": "sha256:c345f66e1dcd5e4fefffed072b4e24a3252f89bf4d77d32d4dbccea2b4aeb976",
+      "consumers": [
+        {
+          "name": "CausalMarkerCard",
+          "file": "src/case-file/CaseAnalysisSections.tsx",
+          "fields": [
+            "actor",
+            "category",
+            "codeReferences",
+            "id",
+            "label",
+            "occurredAt",
+            "source",
+            "summary",
+            "url"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "crumbId": "The card links to the source and code references instead.",
+        "objectId": "Object identity is retained in Crumbs but omitted from the sequence card.",
+        "objectType": "Object identity is retained in Crumbs but omitted from the sequence card."
+      }
+    },
+    {
+      "schema": "CodeReference",
+      "contractHash": "sha256:1fe6f0df64a2fa21b68b4e8b074527c426b55ef0c0590a800027dd55e2a52264",
+      "consumers": [
+        {
+          "name": "CodeReferenceLink",
+          "file": "src/case-file/ui.tsx",
+          "fields": [
+            "endLine",
+            "excerpt",
+            "id",
+            "path",
+            "startLine",
+            "url"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "commitSha": "The immutable URL already identifies the commit.",
+        "projectId": "The path and link provide sufficient compact context."
+      }
+    },
+    {
+      "schema": "SourceLink",
+      "contractHash": "sha256:36317dcc611ad6d20aef256f606d2c5bd1ed446fdfc4f7cc46079ee55233e5d5",
+      "consumers": [
+        {
+          "name": "ResponderResources",
+          "file": "src/features/cases/ResponderResources.tsx",
+          "fields": [
+            "label",
+            "url"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "PagerDutyIncidentState",
+      "contractHash": "sha256:44c2a9b71e4c19b292353231f59d503da81bc8408234742089f3267d4750c900",
+      "consumers": [
+        {
+          "name": "CaseFileHeader",
+          "file": "src/features/cases/CaseFileHeader.tsx",
+          "fields": []
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "PatternLifecycleState",
+      "contractHash": "sha256:8c154027064aaaaf338d247fff11ef8118c3a707a355c6516ced050257d93343",
+      "consumers": [
+        {
+          "name": "PatternPanel",
+          "file": "src/case-file/PatternPanel.tsx",
+          "fields": []
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "DemoAvailability",
+      "contractHash": "sha256:5e9919a2863c24311cf2d81a7e31273a5b7fd3cf183cd07f45710b4da79ceb44",
+      "consumers": [
+        {
+          "name": "useDemoReplay",
+          "file": "src/features/demo/useDemoReplay.ts",
+          "fields": [
+            "caseUrl"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "enabled": "A successful response already indicates demo availability.",
+        "caseId": "Navigation uses the server-provided Case URL."
+      }
+    },
+    {
+      "schema": "OperationsCatalog",
+      "contractHash": "sha256:29c0f1de48be74eafaf48f50f9f7667dc8cf320c315ee40f5c0e93205466957c",
+      "consumers": [
+        {
+          "name": "resolveCatalogScope",
+          "file": "src/features/catalog/catalogModel.ts",
+          "fields": [
+            "teams"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "TeamCatalogItem",
+      "contractHash": "sha256:79a172e55bd22acd46c27d594ea4eb85022d2f7b82be4d6ab387da66c4be9b52",
+      "consumers": [
+        {
+          "name": "resolveCatalogScope",
+          "file": "src/features/catalog/catalogModel.ts",
+          "fields": [
+            "id",
+            "serviceCollections"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "ServiceCollectionCatalogItem",
+      "contractHash": "sha256:40c8371f79f46e401c43d2208fab100736b5625539268cc096010c0e1d434539",
+      "consumers": [
+        {
+          "name": "resolveCatalogScope",
+          "file": "src/features/catalog/catalogModel.ts",
+          "fields": [
+            "id",
+            "services"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "ObservedServiceCatalogItem",
+      "contractHash": "sha256:d6bc433ccf7e5ad7a5d8f8dd63eda93f2df9f6f5e255d271331759319e7021af",
+      "consumers": [
+        {
+          "name": "resolveCatalogScope",
+          "file": "src/features/catalog/catalogModel.ts",
+          "fields": [
+            "pagerDutyServiceId",
+            "recipeId"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "RecentPagerDutyIncidents",
+      "contractHash": "sha256:a86b81c2683bca68b944963f63653694a22c3a9832309e624d7db53e97144dab",
+      "consumers": [
+        {
+          "name": "CaseActivity",
+          "file": "src/features/cases/CaseActivity.tsx",
+          "fields": [
+            "hasMore",
+            "incidents",
+            "until"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "since": "The selected time-frame label already communicates the start of the query window."
+      }
+    },
+    {
+      "schema": "RecentPagerDutyIncident",
+      "contractHash": "sha256:eed8c4b965784417c1474b631a4f7703044a9e8d3cb703ba1bce95c1f5430111",
+      "consumers": [
+        {
+          "name": "RecentPagerDutyIncidentList",
+          "file": "src/features/cases/RecentPagerDutyIncidentList.tsx",
+          "fields": [
+            "assignees",
+            "createdAt",
+            "htmlUrl",
+            "id",
+            "incidentNumber",
+            "lastStatusChangeAt",
+            "serviceName",
+            "status",
+            "title",
+            "urgency"
+          ]
+        },
+        {
+          "name": "useCaseActivity",
+          "file": "src/features/cases/useCaseActivity.ts",
+          "fields": [
+            "serviceId"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "CaseTriggerResult",
+      "contractHash": "sha256:ccf3a8e7d19f01594891694944406cb6bcb8f1ec5cc96ae48cddaf139540d8cf",
+      "consumers": [
+        {
+          "name": "useCaseActivity",
+          "file": "src/features/cases/useCaseActivity.ts",
+          "fields": [
+            "caseUrl"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "duplicate": "Both newly accepted and duplicate events navigate to the canonical Case.",
+        "caseId": "Navigation uses the server-provided Case URL."
+      }
+    },
+    {
+      "schema": "SubmittedCrumbKind",
+      "contractHash": "sha256:a19b55b43856e68e9dd3d8203ad91b48cc8ff271ba79939e617807b25e937476",
+      "consumers": [
+        {
+          "name": "InputAuditRow",
+          "file": "src/features/cases/CaseInputAudit.tsx",
+          "fields": []
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "CaseInput",
+      "contractHash": "sha256:5a694b07ec28b14fbc7e502c933ae488bd40233ddbceb71ec8a9aa218bc36653",
+      "consumers": [
+        {
+          "name": "InputAuditRow",
+          "file": "src/features/cases/CaseInputAudit.tsx",
+          "fields": [
+            "active",
+            "category",
+            "clientCrumbId",
+            "declaredSource",
+            "id",
+            "inputVersion",
+            "occurredAt",
+            "producerPrincipal",
+            "projectedInInputVersion",
+            "receivedAt",
+            "retractedAt",
+            "sequence",
+            "severity",
+            "summary",
+            "supersedesCrumbId",
+            "supersededByCrumbId",
+            "trustLevel",
+            "kind"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "actor": "The compact audit row identifies the authenticated producer instead.",
+        "attributes": "Raw submitted attributes are retained for audit but not rendered in the compact table.",
+        "excerpt": "The audit table shows the bounded summary rather than potentially long excerpts.",
+        "objectId": "Object metadata remains available through the API for deeper audit tooling.",
+        "objectType": "Object metadata remains available through the API for deeper audit tooling.",
+        "retractedInputVersion": "The row presents the human-readable retraction state and timestamp.",
+        "sourceReference": "The compact row displays declared source provenance only.",
+        "url": "The audit view deliberately does not turn submitted URLs into primary navigation."
+      }
+    },
+    {
+      "schema": "PageOfCaseInput",
+      "contractHash": "sha256:52b01867e645182d60db03136a574a71a18afdbf05713736699af3fe2f0c863d",
+      "consumers": [
+        {
+          "name": "CaseInputAudit",
+          "file": "src/features/cases/CaseInputAudit.tsx",
+          "fields": [
+            "items",
+            "total"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "RecentCase",
+      "contractHash": "sha256:83f522a8e71b5b9402ab03aaf6758e1ca0d9ae35854f9d2389cdf2c8af39aba5",
+      "consumers": [
+        {
+          "name": "CaseRow",
+          "file": "src/features/cases/CaseList.tsx",
+          "fields": [
+            "createdBy",
+            "inputVersion",
+            "origin",
+            "recipeId",
+            "projectedInputVersion",
+            "caseUrl",
+            "caseFileVersion",
+            "serviceId",
+            "caseId",
+            "status",
+            "title",
+            "updatedAt"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "RecentCases",
+      "contractHash": "sha256:95bdf65d9b4b9d724133d4945830c399b9ccf9b39ec8602dbe117097c53ca9d7",
+      "consumers": [
+        {
+          "name": "CaseActivity",
+          "file": "src/features/cases/CaseActivity.tsx",
+          "fields": [
+            "cases",
+            "total"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "ProblemDetails",
+      "contractHash": "sha256:33df09f27a3c6abbcbfaa9503bd547724bf0446131d8f383e89122eaaba0eca2",
+      "consumers": [
+        {
+          "name": "responseMessage",
+          "file": "src/features/cases/caseActivityApi.ts",
+          "fields": [
+            "detail",
+            "title"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "instance": "The landing page presents a concise actionable integration error.",
+        "status": "Fetch response status is used for success handling but is not displayed.",
+        "type": "The landing page presents the human-readable title and detail."
+      }
+    },
+    {
+      "schema": "CaseUpdated",
+      "contractHash": "sha256:0bb42f193cff8c8a17230c2c60025d396648421a228731da96913bc3f2ff9612",
+      "consumers": [
+        {
+          "name": "useCase",
+          "file": "src/features/cases/useCase.ts",
+          "fields": [
+            "inputVersion",
+            "projectedInputVersion",
+            "status",
+            "caseFileVersion"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "changedSections": "The client refetches the canonical Case File instead of patching sections.",
+        "caseId": "The SignalR connection has already joined one Case group."
+      }
+    },
+    {
+      "schema": "CaseStatusChanged",
+      "contractHash": "sha256:d4f85541c1b0ab0715c5280386851237dc05f5d296ddc17a68d6b8b638fd6d7c",
+      "consumers": [
+        {
+          "name": "useCase",
+          "file": "src/features/cases/useCase.ts",
+          "fields": [
+            "inputVersion",
+            "projectedInputVersion",
+            "status",
+            "caseFileVersion"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "caseId": "The SignalR connection has already joined one Case group."
+      }
+    },
+    {
+      "schema": "CaseStatus",
+      "contractHash": "sha256:d445bc05158c52804fd1104ffd107f61b260019d76e9ec52faedbe8fca00fba6",
+      "consumers": [
+        {
+          "name": "useCase",
+          "file": "src/features/cases/useCase.ts",
+          "fields": [
+            "inputVersion",
+            "progress",
+            "projectedInputVersion",
+            "status",
+            "caseFileVersion"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "caseId": "The Case route already supplies the identifier.",
+        "isFrozen": "Freeze state does not change live progress presentation.",
+        "pagerDutyState": "PagerDuty incident state is rendered from the canonical Case File.",
+        "updatedAt": "Progress carries its own responder-visible update timestamp."
+      }
+    },
+    {
+      "schema": "CaseProgressProjection",
+      "contractHash": "sha256:bade4af22bbfa3e6d5e0b511d2540f6ca5c5c8568d92a2e8fe8840a953a16135",
+      "consumers": [
+        {
+          "name": "CaseProgressPanel",
+          "file": "src/features/cases/CaseProgress.tsx",
+          "fields": [
+            "aiSynthesisState",
+            "currentLookbackMinutes",
+            "currentPass",
+            "deterministicCaseFileUsable",
+            "earlyCrumbs",
+            "elapsedDurationMilliseconds",
+            "onlyAiSynthesisRemaining",
+            "phase",
+            "revision",
+            "crumbSources"
+          ]
+        },
+        {
+          "name": "useCase",
+          "file": "src/features/cases/useCase.ts",
+          "fields": [
+            "attemptId",
+            "baseCaseFileVersion",
+            "caseId",
+            "revision",
+            "startedAt",
+            "updatedAt"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "CrumbSourceProgress",
+      "contractHash": "sha256:06d2522e1f403cb3a32b5b9b43df344859e44795b843b74006f6a1cec2cc0f73",
+      "consumers": [
+        {
+          "name": "SourceProgressRow",
+          "file": "src/features/cases/CaseProgress.tsx",
+          "fields": [
+            "diagnostic",
+            "durationMilliseconds",
+            "crumbCount",
+            "health",
+            "lookbackMinutes",
+            "pass",
+            "requestState",
+            "source"
+          ]
+        }
+      ],
+      "ignoredFields": {
+        "startedAt": "Per-source timing is summarized as elapsed duration.",
+        "updatedAt": "The panel reacts to projection revisions rather than displaying raw update timestamps."
+      }
+    },
+    {
+      "schema": "CaseEarlyCrumb",
+      "contractHash": "sha256:c17c151de123f0031b341efd51305a425fc5715767924c9da2173f8e7b7aa743",
+      "consumers": [
+        {
+          "name": "EarlyCrumbRow",
+          "file": "src/features/cases/CaseProgress.tsx",
+          "fields": [
+            "confidence",
+            "id",
+            "occurredAt",
+            "severity",
+            "source",
+            "summary"
+          ]
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "CaseProgressPhase",
+      "contractHash": "sha256:0418c0ab208f6f67113b9b78fcde82814e96c00d27577a35a3a2a46bfab5de34",
+      "consumers": [
+        {
+          "name": "CaseProgressPanel",
+          "file": "src/features/cases/CaseProgress.tsx",
+          "fields": []
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "CrumbSourceProgressState",
+      "contractHash": "sha256:e2cd275370811d09ec6806b42942c83e916b759537460f43c675b4900e1a890c",
+      "consumers": [
+        {
+          "name": "SourceProgressRow",
+          "file": "src/features/cases/CaseProgress.tsx",
+          "fields": []
+        }
+      ],
+      "ignoredFields": {}
+    },
+    {
+      "schema": "AiSynthesisProgressState",
+      "contractHash": "sha256:bca6e89aa7f18a31b520725f1897a7493e525d223c766ef4480234dcced00cb7",
+      "consumers": [
+        {
+          "name": "CaseProgressPanel",
+          "file": "src/features/cases/CaseProgress.tsx",
+          "fields": []
+        }
+      ],
+      "ignoredFields": {}
+    }
+  ],
+  "operations": [
+    {
+      "operationId": "GetOperationsCatalog",
+      "contractHash": "sha256:c2f50fd675336982efd4cd35683dbb8fe5a29db71eb978515d09d140a7b14814",
+      "consumers": [
+        {
+          "name": "getOperationsCatalog",
+          "file": "src/features/catalog/catalogApi.ts",
+          "behavior": "Loads only the caller-authorized team hierarchy without caching."
+        }
+      ],
+      "ignoredSchemas": {}
+    },
+    {
+      "operationId": "GetCaseFile",
+      "contractHash": "sha256:8c8d213426785ef235227af36da54b12c48807d073d900b2fd9a04a88cc4be79",
+      "consumers": [
+        {
+          "name": "useCase",
+          "file": "src/features/cases/useCase.ts",
+          "behavior": "Handles 200, 202, 304, and 404 responses and sends If-None-Match."
+        }
+      ],
+      "ignoredSchemas": {}
+    },
+    {
+      "operationId": "GetCaseStatus",
+      "contractHash": "sha256:3c95dffae6b0709226f3da506072b6e1e2be7d9da18d4292d0f522299b0d80a6",
+      "consumers": [
+        {
+          "name": "useCase",
+          "file": "src/features/cases/useCase.ts",
+          "behavior": "Loads persisted progress after every Case File read and clears it when status returns null."
+        }
+      ],
+      "ignoredSchemas": {}
+    },
+    {
+      "operationId": "ListCases",
+      "contractHash": "sha256:c39fa18067bcbb871cccfe765e8179bd3b8f3199ce786d97f8e75da29372ae22",
+      "consumers": [
+        {
+          "name": "getRecentCases",
+          "file": "src/features/cases/caseActivityApi.ts",
+          "behavior": "Loads the bounded caller-authorized durable session list without caching."
+        }
+      ],
+      "ignoredSchemas": {}
+    },
+    {
+      "operationId": "ListCaseInputs",
+      "contractHash": "sha256:2a686efa0370b179fd73a63e103a4a5dd88dff8f47451264f345e181e16a3277",
+      "consumers": [
+        {
+          "name": "getCaseInputs",
+          "file": "src/features/cases/caseInputApi.ts",
+          "behavior": "Loads the bounded canonical input audit page without caching."
+        }
+      ],
+      "ignoredSchemas": {}
+    },
+    {
+      "operationId": "GetRecentPagerDutyIncidents",
+      "contractHash": "sha256:3e8911313b0e104899fcea430146b1ede8a82faf369a17fb18fd874bad1d67d0",
+      "consumers": [
+        {
+          "name": "getRecentPagerDutyIncidents",
+          "file": "src/features/cases/caseActivityApi.ts",
+          "behavior": "Pulls a bounded PagerDuty time frame without caching and renders loading, empty, error, and populated states."
+        }
+      ],
+      "ignoredSchemas": {}
+    },
+    {
+      "operationId": "TriggerPagerDutyIncident",
+      "contractHash": "sha256:b83e4027a8ec5f7ecd471e03dd41cc7b8952e83b81a9157f0edeb03f1850b1b7",
+      "consumers": [
+        {
+          "name": "openPagerDutyCase",
+          "file": "src/features/cases/caseActivityApi.ts",
+          "behavior": "Starts the selected PagerDuty incident through the canonical intake path and navigates to its Case URL."
+        }
+      ],
+      "ignoredSchemas": {}
+    },
+    {
+      "operationId": "GetDemoAvailability",
+      "contractHash": "sha256:cb61444e70a0c5a2f5fcf909ed009297801a560dbe13421380e584fba63c628d",
+      "consumers": [
+        {
+          "name": "getDemoAvailability",
+          "file": "src/features/demo/demoApi.ts",
+          "behavior": "Fetches demo availability without caching; the landing page only renders the action when a response is available."
+        }
+      ],
+      "ignoredSchemas": {}
+    },
+    {
+      "operationId": "ResetDemo",
+      "contractHash": "sha256:ecf0585e90203aa292642fa43164cc95b74fd52498acf41686a8d9577fafd798",
+      "consumers": [
+        {
+          "name": "resetDemo",
+          "file": "src/features/demo/demoApi.ts",
+          "behavior": "POSTs a reset before either starting or replaying the demo."
+        }
+      ],
+      "ignoredSchemas": {
+        "DemoReset": "The UI checks only whether reset succeeded and does not read the response body."
+      }
+    }
+  ]
+}

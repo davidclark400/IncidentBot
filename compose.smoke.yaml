@@ -2,11 +2,11 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: incidentbot_smoke
-      POSTGRES_USER: incidentbot
-      POSTGRES_PASSWORD: incidentbot-smoke-only
+      POSTGRES_DB: panko_smoke
+      POSTGRES_USER: panko
+      POSTGRES_PASSWORD: panko-smoke-only
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U incidentbot -d incidentbot_smoke"]
+      test: ["CMD-SHELL", "pg_isready -U panko -d panko_smoke"]
       interval: 2s
       timeout: 2s
       retries: 30
@@ -16,13 +16,16 @@ services:
       context: .
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__IncidentBot: Host=postgres;Port=5432;Database=incidentbot_smoke;Username=incidentbot;Password=incidentbot-smoke-only
-      IncidentBot__ProfilesPath: /app/config/smoke-profile.yaml
-      IncidentBot__RequireSlackForReadiness: "false"
+      ConnectionStrings__Panko: Host=postgres;Port=5432;Database=panko_smoke;Username=panko;Password=panko-smoke-only
+      Panko__RecipesPath: /app/config/smoke-recipe.yaml
+      Panko__RequireSlackForReadiness: "false"
       PagerDuty__RequireSignature: "true"
       PAGERDUTY_WEBHOOK_SECRET: local-smoke-secret
       PAGERDUTY_API_TOKEN: local-smoke-token
-      IngressIdentity__Required: "true"
+      JwtIdentity__Required: "true"
+      JwtIdentity__Authority: https://identity.smoke.internal
+      JwtIdentity__Issuer: https://identity.smoke.internal
+      TrustedProxies__KnownProxies__0: 127.0.0.1
       Slack__Enabled: "false"
       LITELLM_API_KEY: local-smoke-key
     depends_on:
@@ -36,5 +39,5 @@ services:
     security_opt:
       - no-new-privileges:true
     volumes:
-      - ./tests/fixtures/smoke-profile.yaml:/app/config/smoke-profile.yaml:ro
+      - ./tests/fixtures/smoke-recipe.yaml:/app/config/smoke-recipe.yaml:ro
       - ./tests/fixtures/smoke-appsettings.Production.json:/app/appsettings.Production.json:ro

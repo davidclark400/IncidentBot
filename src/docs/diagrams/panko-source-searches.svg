@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1380" viewBox="0 0 1920 1380" role="img" style="max-width: 100%; height: auto;">
+  <title>Panko flow diagram</title>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#475569"/>
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <polyline points="960,290 960,315 215,315 215,360" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="960,290 960,315 780,315 780,330" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="960,290 960,315 1525,315 1525,340" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="960,290 960,820 340,820 340,880" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="960,290 960,820 1030,820 1030,850" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="960,290 960,820 1650,820 1650,850" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+  <g>
+  <rect x="40" y="30" width="1840" height="90" rx="14" fill="#172554" stroke="#172554" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#ffffff" text-anchor="middle"><tspan x="960" y="85.2">Crumb collection: what each source searches</tspan></text>
+</g>
+<g>
+  <rect x="240" y="160" width="1440" height="130" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="960" y="219.3">Shared input: Recipe-scoped service + safe labels • window = openedAt − 30 min through now • max items/bytes • Recipe revision</tspan><tspan x="960" y="244.3">Each enabled Crumb source runs concurrently using native API or configured MCP transport.</tspan></text>
+</g>
+<g>
+  <rect x="40" y="360" width="350" height="390" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="215" y="459.87">PagerDuty</tspan><tspan x="215" y="482.37"></tspan><tspan x="215" y="504.87">GET /incidents/{pagerdutyId}</tspan><tspan x="215" y="527.37"></tspan><tspan x="215" y="549.87">Exact incident lookup, not broad search.</tspan><tspan x="215" y="572.37">Captures created time, current status,</tspan><tspan x="215" y="594.87">severity and incident link.</tspan><tspan x="215" y="617.37"></tspan><tspan x="215" y="639.87">Crumb: incident state</tspan><tspan x="215" y="662.37">Trail: PagerDuty event</tspan></text>
+</g>
+<g>
+  <rect x="430" y="330" width="700" height="470" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="780" y="464.53">GitLab — per allowlisted project / branch / environment</tspan><tspan x="780" y="485.78"></tspan><tspan x="780" y="507.03">• Merged MRs updated after window start; retain created + merged events</tspan><tspan x="780" y="528.28">• Commits since/until; inspect diffs for up to 5 commits, only relevantPaths</tspan><tspan x="780" y="549.53">• Parent + child pipelines updated within the window (paginated)</tspan><tspan x="780" y="570.78">• Deployments filtered by configured environments and exact window</tspan><tspan x="780" y="592.03">• Failed pipelines first; query failed current jobs, failed retry history,</tspan><tspan x="780" y="613.28">  then canceled jobs; collapse retry families and rank earliest hard failure</tspan><tspan x="780" y="634.53">• Read bounded useful trace tails for selected failed job families</tspan><tspan x="780" y="655.78"></tspan><tspan x="780" y="677.03">Produces change, pipeline, failed-step, deployment and code-reference Crumbs.</tspan></text>
+</g>
+<g>
+  <rect x="1170" y="340" width="710" height="450" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="1525" y="469.87">Nomad — only allowlisted namespace / job pairs</tspan><tspan x="1525" y="492.37"></tspan><tspan x="1525" y="514.87">1. GET job state for every selected job before larger detail calls</tspan><tspan x="1525" y="537.37">2. GET allocations?all=true; retain non-running/non-complete allocations</tspan><tspan x="1525" y="559.87">3. GET deployments; flag non-successful state</tspan><tspan x="1525" y="582.37">4. GET evaluations; flag non-complete state</tspan><tspan x="1525" y="604.87"></tspan><tspan x="1525" y="627.37">Requests include configured region + namespace. The Nomad token uses</tspan><tspan x="1525" y="649.87">X-Nomad-Token. Primary job state is protected from a noisy job exhausting</tspan><tspan x="1525" y="672.37">the shared byte budget.</tspan></text>
+</g>
+<g>
+  <rect x="40" y="880" width="600" height="370" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="340" y="981.12">Grafana</tspan><tspan x="340" y="1003.62"></tspan><tspan x="340" y="1026.12">• Build dashboard and panel links for the exact time window</tspan><tspan x="340" y="1048.62">• GET annotations filtered by configured tags, from/to and item limit</tspan><tspan x="340" y="1071.12">• Render safe label templates into each configured datasource query</tspan><tspan x="340" y="1093.62">• POST /api/ds/query with 15s interval and max 240 data points</tspan><tspan x="340" y="1116.12">• Reduce numeric values against configured thresholds</tspan><tspan x="340" y="1138.62"></tspan><tspan x="340" y="1161.12">Produces annotation Trail entries and metric snapshot Crumbs.</tspan></text>
+</g>
+<g>
+  <rect x="680" y="850" width="700" height="420" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="1030" y="964.87">VictoriaLogs — scoped streams and configured LogSQL templates</tspan><tspan x="1030" y="987.37"></tspan><tspan x="1030" y="1009.87">1. Render safe label values into each expression.</tspan><tspan x="1030" y="1032.37">2. Count every configured query first with /select/logsql/hits (60s step).</tspan><tspan x="1030" y="1054.87">3. Only positive-count queries fetch samples with selected fields,</tspan><tspan x="1030" y="1077.37">   ascending _time order and a bounded limit (up to 20).</tspan><tspan x="1030" y="1099.87">4. Deduplicate NDJSON lines, apply configured regex redaction,</tspan><tspan x="1030" y="1122.37">   preserve the first observed error as a Trail anchor.</tspan><tspan x="1030" y="1144.87"></tspan><tspan x="1030" y="1167.37">Counting all streams first stops one noisy stream from starving later queries.</tspan></text>
+</g>
+<g>
+  <rect x="1420" y="850" width="460" height="420" rx="14" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="1650" y="942.37">Shared Crumb-source boundary</tspan><tspan x="1650" y="964.87"></tspan><tspan x="1650" y="987.37">• Per-source timeout (1–120s)</tspan><tspan x="1650" y="1009.87">• Cumulative byte and item limits</tspan><tspan x="1650" y="1032.37">• Stable IDs + provenance</tspan><tspan x="1650" y="1054.87">• Relevance ranking before truncation</tspan><tspan x="1650" y="1077.37">• Health: complete / partial / unavailable</tspan><tspan x="1650" y="1099.87"></tspan><tspan x="1650" y="1122.37">MCP additionally validates source identity,</tspan><tspan x="1650" y="1144.87">allowed resources and URLs; removes secrets,</tspan><tspan x="1650" y="1167.37">deduplicates and fits retained output to 90%</tspan><tspan x="1650" y="1189.87">of its byte budget.</tspan></text>
+</g>
+</svg>

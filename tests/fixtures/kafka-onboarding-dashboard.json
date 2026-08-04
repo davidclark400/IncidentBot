@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Bot-only Kafka evidence dashboard for IncidentBot profile kafka-synthetic-fixture; generated from metric pack synthetic-fixture-kafka-v1.",
+  "description": "Panko-generated Kafka Crumb dashboard for Recipe kafka-synthetic-fixture; generated from metric pack synthetic-fixture-kafka-v1.",
   "editable": false,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -25,7 +25,7 @@
     {
       "id": 2,
       "title": "Topic byte rate",
-      "description": "IncidentBot metric topic-byte-rate; context evidence; reducer average; unit bytes/s.",
+      "description": "Panko metric topic-byte-rate; Crumb mode context; reducer average; unit bytes/s.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -91,7 +91,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(incidentbot_fixture_kafka_topic_bytes_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022}[5m]))",
+          "expr": "sum(rate(panko_fixture_kafka_topic_bytes_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022}[5m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -101,7 +101,7 @@
     {
       "id": 3,
       "title": "Topic message rate",
-      "description": "IncidentBot metric topic-message-rate; context evidence; reducer average; unit messages/s.",
+      "description": "Panko metric topic-message-rate; Crumb mode context; reducer average; unit messages/s.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -167,7 +167,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(incidentbot_fixture_kafka_topic_messages_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022}[5m]))",
+          "expr": "sum(rate(panko_fixture_kafka_topic_messages_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022}[5m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -189,7 +189,7 @@
     {
       "id": 5,
       "title": "Available brokers",
-      "description": "IncidentBot metric broker-availability; anomaly evidence; reducer minimum; unit brokers.",
+      "description": "Panko metric broker-availability; Crumb mode anomaly; reducer minimum; unit brokers.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -255,7 +255,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(incidentbot_fixture_kafka_broker_up{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "expr": "sum(panko_fixture_kafka_broker_up{cluster=~\u0022${clusterRegex:regex}\u0022})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -265,7 +265,7 @@
     {
       "id": 6,
       "title": "ISR shrink rate",
-      "description": "IncidentBot metric isr-shrink-rate; anomaly evidence; reducer maximum; unit operations/s.",
+      "description": "Panko metric isr-shrink-rate; Crumb mode anomaly; reducer maximum; unit operations/s.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -331,7 +331,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(incidentbot_fixture_kafka_isr_shrinks_total{cluster=~\u0022${clusterRegex:regex}\u0022}[5m]))",
+          "expr": "sum(rate(panko_fixture_kafka_isr_shrinks_total{cluster=~\u0022${clusterRegex:regex}\u0022}[5m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -341,7 +341,7 @@
     {
       "id": 7,
       "title": "Active partition leaders",
-      "description": "IncidentBot metric leader-count; anomaly evidence; reducer minimum; unit leaders.",
+      "description": "Panko metric leader-count; Crumb mode anomaly; reducer minimum; unit leaders.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -407,7 +407,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(incidentbot_fixture_kafka_partition_leaders{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "expr": "sum(panko_fixture_kafka_partition_leaders{cluster=~\u0022${clusterRegex:regex}\u0022})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -417,7 +417,7 @@
     {
       "id": 8,
       "title": "Offline partitions",
-      "description": "IncidentBot metric offline-partitions; anomaly evidence; reducer maximum; unit partitions.",
+      "description": "Panko metric offline-partitions; Crumb mode anomaly; reducer maximum; unit partitions.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -483,7 +483,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(incidentbot_fixture_kafka_offline_partitions{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "expr": "sum(panko_fixture_kafka_offline_partitions{cluster=~\u0022${clusterRegex:regex}\u0022})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -493,7 +493,7 @@
     {
       "id": 9,
       "title": "Under-replicated partitions",
-      "description": "IncidentBot metric under-replicated-partitions; anomaly evidence; reducer maximum; unit partitions.",
+      "description": "Panko metric under-replicated-partitions; Crumb mode anomaly; reducer maximum; unit partitions.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -559,7 +559,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(incidentbot_fixture_kafka_under_replicated_partitions{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "expr": "sum(panko_fixture_kafka_under_replicated_partitions{cluster=~\u0022${clusterRegex:regex}\u0022})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -581,7 +581,7 @@
     {
       "id": 11,
       "title": "Consumer commit error rate",
-      "description": "IncidentBot metric consumer-commit-errors; anomaly evidence; reducer maximum; unit errors/s.",
+      "description": "Panko metric consumer-commit-errors; Crumb mode anomaly; reducer maximum; unit errors/s.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -647,7 +647,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(incidentbot_fixture_kafka_consumer_commit_errors_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022}[5m]))",
+          "expr": "sum(rate(panko_fixture_kafka_consumer_commit_errors_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022}[5m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -657,7 +657,7 @@
     {
       "id": 12,
       "title": "Consumer fetch error rate",
-      "description": "IncidentBot metric consumer-fetch-errors; anomaly evidence; reducer maximum; unit errors/s.",
+      "description": "Panko metric consumer-fetch-errors; Crumb mode anomaly; reducer maximum; unit errors/s.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -723,7 +723,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(incidentbot_fixture_kafka_consumer_fetch_errors_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022}[5m]))",
+          "expr": "sum(rate(panko_fixture_kafka_consumer_fetch_errors_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022}[5m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -733,7 +733,7 @@
     {
       "id": 13,
       "title": "Consumer lag",
-      "description": "IncidentBot metric consumer-lag; anomaly evidence; reducer maximum; unit messages.",
+      "description": "Panko metric consumer-lag; Crumb mode anomaly; reducer maximum; unit messages.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -799,7 +799,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "max(incidentbot_fixture_kafka_consumer_lag{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022})",
+          "expr": "max(panko_fixture_kafka_consumer_lag{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -809,7 +809,7 @@
     {
       "id": 14,
       "title": "Consumer lag growth",
-      "description": "IncidentBot metric consumer-lag-growth; anomaly evidence; reducer maximum; unit messages/s.",
+      "description": "Panko metric consumer-lag-growth; Crumb mode anomaly; reducer maximum; unit messages/s.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -875,7 +875,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "max(deriv(incidentbot_fixture_kafka_consumer_lag{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022}[5m]))",
+          "expr": "max(deriv(panko_fixture_kafka_consumer_lag{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022}[5m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -885,7 +885,7 @@
     {
       "id": 15,
       "title": "Consumer group members",
-      "description": "IncidentBot metric consumer-members; anomaly evidence; reducer minimum; unit members.",
+      "description": "Panko metric consumer-members; Crumb mode anomaly; reducer minimum; unit members.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -951,7 +951,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "min(incidentbot_fixture_kafka_consumer_group_members{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022})",
+          "expr": "min(panko_fixture_kafka_consumer_group_members{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -961,7 +961,7 @@
     {
       "id": 16,
       "title": "Consumer rebalance rate",
-      "description": "IncidentBot metric consumer-rebalances; anomaly evidence; reducer maximum; unit operations/s.",
+      "description": "Panko metric consumer-rebalances; Crumb mode anomaly; reducer maximum; unit operations/s.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1027,7 +1027,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(incidentbot_fixture_kafka_consumer_rebalances_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022}[5m]))",
+          "expr": "sum(rate(panko_fixture_kafka_consumer_rebalances_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022,consumer_group=~\u0022${consumerGroupRegex:regex}\u0022}[5m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1049,7 +1049,7 @@
     {
       "id": 18,
       "title": "Producer buffer pressure",
-      "description": "IncidentBot metric producer-buffer-pressure; anomaly evidence; reducer maximum; unit ratio.",
+      "description": "Panko metric producer-buffer-pressure; Crumb mode anomaly; reducer maximum; unit ratio.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1115,7 +1115,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "max(incidentbot_fixture_kafka_producer_buffer_ratio{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022})",
+          "expr": "max(panko_fixture_kafka_producer_buffer_ratio{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1125,7 +1125,7 @@
     {
       "id": 19,
       "title": "Producer error rate",
-      "description": "IncidentBot metric producer-errors; anomaly evidence; reducer maximum; unit errors/s.",
+      "description": "Panko metric producer-errors; Crumb mode anomaly; reducer maximum; unit errors/s.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1191,7 +1191,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(incidentbot_fixture_kafka_producer_errors_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022}[5m]))",
+          "expr": "sum(rate(panko_fixture_kafka_producer_errors_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022}[5m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1201,7 +1201,7 @@
     {
       "id": 20,
       "title": "Producer request latency",
-      "description": "IncidentBot metric producer-latency; anomaly evidence; reducer maximum; unit seconds.",
+      "description": "Panko metric producer-latency; Crumb mode anomaly; reducer maximum; unit seconds.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1267,7 +1267,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "max(incidentbot_fixture_kafka_producer_request_latency_seconds{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022})",
+          "expr": "max(panko_fixture_kafka_producer_request_latency_seconds{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1277,7 +1277,7 @@
     {
       "id": 21,
       "title": "Producer retry rate",
-      "description": "IncidentBot metric producer-retries; anomaly evidence; reducer maximum; unit retries/s.",
+      "description": "Panko metric producer-retries; Crumb mode anomaly; reducer maximum; unit retries/s.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1343,7 +1343,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(incidentbot_fixture_kafka_producer_retries_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022}[5m]))",
+          "expr": "sum(rate(panko_fixture_kafka_producer_retries_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022}[5m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1353,7 +1353,7 @@
     {
       "id": 22,
       "title": "Producer send rate",
-      "description": "IncidentBot metric producer-send-rate; context evidence; reducer average; unit messages/s.",
+      "description": "Panko metric producer-send-rate; Crumb mode context; reducer average; unit messages/s.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1419,7 +1419,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(incidentbot_fixture_kafka_producer_records_sent_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022}[5m]))",
+          "expr": "sum(rate(panko_fixture_kafka_producer_records_sent_total{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022}[5m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1429,7 +1429,7 @@
     {
       "id": 23,
       "title": "Producer throttle time",
-      "description": "IncidentBot metric producer-throttle; anomaly evidence; reducer maximum; unit seconds.",
+      "description": "Panko metric producer-throttle; Crumb mode anomaly; reducer maximum; unit seconds.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1495,7 +1495,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "max(incidentbot_fixture_kafka_producer_throttle_seconds{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022})",
+          "expr": "max(panko_fixture_kafka_producer_throttle_seconds{cluster=~\u0022${clusterRegex:regex}\u0022,topic=~\u0022${topicRegex:regex}\u0022})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1517,7 +1517,7 @@
     {
       "id": 25,
       "title": "Broker request latency",
-      "description": "IncidentBot metric broker-request-latency; anomaly evidence; reducer maximum; unit seconds.",
+      "description": "Panko metric broker-request-latency; Crumb mode anomaly; reducer maximum; unit seconds.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1583,7 +1583,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "max(incidentbot_fixture_kafka_broker_request_latency_seconds{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "expr": "max(panko_fixture_kafka_broker_request_latency_seconds{cluster=~\u0022${clusterRegex:regex}\u0022})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1593,7 +1593,7 @@
     {
       "id": 26,
       "title": "Broker throttle time",
-      "description": "IncidentBot metric broker-throttle; anomaly evidence; reducer maximum; unit seconds.",
+      "description": "Panko metric broker-throttle; Crumb mode anomaly; reducer maximum; unit seconds.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1659,7 +1659,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "max(incidentbot_fixture_kafka_broker_throttle_seconds{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "expr": "max(panko_fixture_kafka_broker_throttle_seconds{cluster=~\u0022${clusterRegex:regex}\u0022})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1669,7 +1669,7 @@
     {
       "id": 27,
       "title": "Leader election rate",
-      "description": "IncidentBot metric leader-election-rate; anomaly evidence; reducer maximum; unit operations/s.",
+      "description": "Panko metric leader-election-rate; Crumb mode anomaly; reducer maximum; unit operations/s.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1735,7 +1735,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(incidentbot_fixture_kafka_leader_elections_total{cluster=~\u0022${clusterRegex:regex}\u0022}[5m]))",
+          "expr": "sum(rate(panko_fixture_kafka_leader_elections_total{cluster=~\u0022${clusterRegex:regex}\u0022}[5m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1757,7 +1757,7 @@
     {
       "id": 29,
       "title": "JVM CPU pressure",
-      "description": "IncidentBot metric jvm-cpu-pressure; anomaly evidence; reducer maximum; unit ratio.",
+      "description": "Panko metric jvm-cpu-pressure; Crumb mode anomaly; reducer maximum; unit ratio.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1823,7 +1823,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "max(incidentbot_fixture_kafka_jvm_cpu_ratio{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "expr": "max(panko_fixture_kafka_jvm_cpu_ratio{cluster=~\u0022${clusterRegex:regex}\u0022})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1833,7 +1833,7 @@
     {
       "id": 30,
       "title": "JVM GC pause",
-      "description": "IncidentBot metric jvm-gc-pause; anomaly evidence; reducer maximum; unit seconds.",
+      "description": "Panko metric jvm-gc-pause; Crumb mode anomaly; reducer maximum; unit seconds.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1899,7 +1899,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "max(incidentbot_fixture_kafka_jvm_gc_pause_seconds{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "expr": "max(panko_fixture_kafka_jvm_gc_pause_seconds{cluster=~\u0022${clusterRegex:regex}\u0022})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1909,7 +1909,7 @@
     {
       "id": 31,
       "title": "JVM heap pressure",
-      "description": "IncidentBot metric jvm-heap-pressure; anomaly evidence; reducer maximum; unit ratio.",
+      "description": "Panko metric jvm-heap-pressure; Crumb mode anomaly; reducer maximum; unit ratio.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1975,7 +1975,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "max(incidentbot_fixture_kafka_jvm_heap_ratio{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "expr": "max(panko_fixture_kafka_jvm_heap_ratio{cluster=~\u0022${clusterRegex:regex}\u0022})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1985,7 +1985,7 @@
     {
       "id": 32,
       "title": "JVM thread count",
-      "description": "IncidentBot metric jvm-thread-pressure; anomaly evidence; reducer maximum; unit threads.",
+      "description": "Panko metric jvm-thread-pressure; Crumb mode anomaly; reducer maximum; unit threads.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -2051,7 +2051,7 @@
             "uid": "synthetic-prometheus"
           },
           "editorMode": "code",
-          "expr": "max(incidentbot_fixture_kafka_jvm_threads{cluster=~\u0022${clusterRegex:regex}\u0022})",
+          "expr": "max(panko_fixture_kafka_jvm_threads{cluster=~\u0022${clusterRegex:regex}\u0022})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -2062,16 +2062,16 @@
   "refresh": "30s",
   "schemaVersion": 39,
   "tags": [
-    "incidentbot",
+    "panko",
     "kafka",
-    "bot-only",
+    "panko-generated",
     "kafka-synthetic-fixture"
   ],
   "templating": {
     "list": [
       {
-        "name": "profile",
-        "label": "IncidentBot profile",
+        "name": "recipe",
+        "label": "Panko Recipe",
         "type": "custom",
         "hide": 0,
         "includeAll": false,
@@ -2173,8 +2173,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "IncidentBot Kafka \u2014 kafka-synthetic-fixture",
-  "uid": "incidentbot-kafka-kafka-synthet-dbf603a6",
+  "title": "Panko Kafka \u2014 kafka-synthetic-fixture",
+  "uid": "panko-kafka-kafka-synthetic-fixture",
   "version": 1,
   "weekStart": ""
 }

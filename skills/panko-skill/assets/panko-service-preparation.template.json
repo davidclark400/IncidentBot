@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "status": "blocked",
+  "observedService": {
+    "name": "replace-with-service-name",
+    "environment": null,
+    "workloadKind": null,
+    "team": null,
+    "serviceCollection": null,
+    "existingRecipeId": null
+  },
+  "sources": [
+    {
+      "id": "user-intent",
+      "kind": "other",
+      "authority": "identity",
+      "locator": "user:intent",
+      "revision": null
+    }
+  ],
+  "provenance": {
+    "/observedService/name": [
+      "user-intent"
+    ]
+  },
+  "coverage": [
+    {
+      "capability": "case-origin",
+      "status": "blocked",
+      "scope": {},
+      "sourceRefs": [],
+      "gaps": ["Discovery has not run."]
+    },
+    {
+      "capability": "deployment",
+      "status": "blocked",
+      "scope": {},
+      "sourceRefs": [],
+      "gaps": ["Discovery has not run."]
+    },
+    {
+      "capability": "topology",
+      "status": "blocked",
+      "scope": {},
+      "sourceRefs": [],
+      "gaps": ["Discovery has not run."]
+    },
+    {
+      "capability": "changes",
+      "status": "blocked",
+      "scope": {},
+      "sourceRefs": [],
+      "gaps": ["Discovery has not run."]
+    },
+    {
+      "capability": "metrics",
+      "status": "blocked",
+      "scope": {},
+      "sourceRefs": [],
+      "gaps": ["Discovery has not run."]
+    },
+    {
+      "capability": "logs",
+      "status": "blocked",
+      "scope": {},
+      "sourceRefs": [],
+      "gaps": ["Discovery has not run."]
+    },
+    {
+      "capability": "messaging",
+      "status": "blocked",
+      "scope": {},
+      "sourceRefs": [],
+      "gaps": ["Discovery has not run."]
+    },
+    {
+      "capability": "publication",
+      "status": "blocked",
+      "scope": {},
+      "sourceRefs": [],
+      "gaps": ["Discovery has not run."]
+    }
+  ],
+  "serviceMetrics": null,
+  "messaging": [],
+  "gaps": [
+    {
+      "code": "discovery-not-run",
+      "message": "Replace the starter values with source-grounded discovery results.",
+      "sourceRefs": []
+    }
+  ]
+}

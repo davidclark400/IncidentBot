@@ -1,31 +1,34 @@
+name: panko
+
 services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: incidentbot
-      POSTGRES_USER: incidentbot
-      POSTGRES_PASSWORD: incidentbot
+      POSTGRES_DB: ${PANKO_POSTGRES_DB:-panko}
+      POSTGRES_USER: ${PANKO_POSTGRES_USER:-panko}
+      POSTGRES_PASSWORD: ${PANKO_POSTGRES_PASSWORD:-panko}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U incidentbot -d incidentbot"]
+      test: ["CMD-SHELL", "pg_isready -U ${PANKO_POSTGRES_USER:-panko} -d ${PANKO_POSTGRES_DB:-panko}"]
       interval: 3s
       timeout: 3s
       retries: 20
     volumes:
-      - incidentbot-postgres:/var/lib/postgresql/data
+      - panko-postgres:/var/lib/postgresql/data
 
   api:
     build:
       context: .
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__IncidentBot: Host=postgres;Port=5432;Database=incidentbot;Username=incidentbot;Password=incidentbot
+      ConnectionStrings__Panko: Host=postgres;Port=5432;Database=${PANKO_POSTGRES_DB:-panko};Username=${PANKO_POSTGRES_USER:-panko};Password=${PANKO_POSTGRES_PASSWORD:-panko}
+      JwtIdentity__Required: "false"
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8080/health/ready"]
       interval: 5s
@@ -33,4 +36,6 @@ services:
       retries: 20
 
 volumes:
-  incidentbot-postgres:
+  panko-postgres:
+    # Override for a differently named existing Compose volume.
+    name: ${PANKO_POSTGRES_VOLUME:-panko_postgres}

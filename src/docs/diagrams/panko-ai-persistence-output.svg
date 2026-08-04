@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1340" viewBox="0 0 1920 1340" role="img" style="max-width: 100%; height: auto;">
+  <title>Panko flow diagram</title>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#475569"/>
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <polyline points="380,275 420,275" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="780,275 820,275" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="1180,275 1220,275" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="1560,275 1600,275" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="1740,380 1740,445 235,445 235,500" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="430,610 480,610" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="870,610 920,610" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="1310,610 1360,610" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="1620,720 1620,780 320,780 320,850" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="1620,720 1620,780 870,780 870,850" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+<polyline points="320,1130 320,1170 1510,1170 1510,1150" fill="none" stroke="#475569" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+  <g>
+  <rect x="40" y="30" width="1840" height="90" rx="14" fill="#172554" stroke="#172554" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#ffffff" text-anchor="middle"><tspan x="960" y="85.2">From Crumb sources to AI, PostgreSQL, web and Slack</tspan></text>
+</g>
+<g>
+  <rect x="40" y="170" width="340" height="210" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="210" y="210.21">CrumbSourceResult[]</tspan><tspan x="210" y="233.96"></tspan><tspan x="210" y="257.71000000000004">source health + diagnostic</tspan><tspan x="210" y="281.46000000000004">Crumbs</tspan><tspan x="210" y="305.21000000000004">Trail candidates</tspan><tspan x="210" y="328.96000000000004">responder links</tspan><tspan x="210" y="352.71000000000004">duration</tspan></text>
+</g>
+<g>
+  <rect x="420" y="170" width="360" height="210" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="600" y="213.62">1. Canonicalize</tspan><tspan x="600" y="236.12"></tspan><tspan x="600" y="258.62">Exact source+ID dedupe.</tspan><tspan x="600" y="281.12">If 24k digest would overflow,</tspan><tspan x="600" y="303.62">compress only repeated VictoriaLogs</tspan><tspan x="600" y="326.12">templates/counts and Nomad</tspan><tspan x="600" y="348.62">allocation-failure templates.</tspan></text>
+</g>
+<g>
+  <rect x="820" y="170" width="360" height="210" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="1000" y="213.62">2. Rank + diversify</tspan><tspan x="1000" y="236.12"></tspan><tspan x="1000" y="258.62">signal tier → severity → confidence</tspan><tspan x="1000" y="281.12">→ first hard failure → proximity</tspan><tspan x="1000" y="303.62"></tspan><tspan x="1000" y="326.12">Two fair rounds across sources before</tspan><tspan x="1000" y="348.62">a noisy source can expand.</tspan></text>
+</g>
+<g>
+  <rect x="1220" y="170" width="340" height="210" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="1390" y="213.62">3. Build bounded digest</tspan><tspan x="1390" y="236.12"></tspan><tspan x="1390" y="258.62">PagerDuty incident fields • ≤40 references</tspan><tspan x="1390" y="281.12">source health/counts • Crumb IDs</tspan><tspan x="1390" y="303.62">representative IDs + occurrences</tspan><tspan x="1390" y="326.12">≤1000-char job excerpts</tspan><tspan x="1390" y="348.62">≤8 code refs/group</tspan></text>
+</g>
+<g>
+  <rect x="1600" y="170" width="280" height="210" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="1740" y="224.87">4. LiteLLM</tspan><tspan x="1740" y="247.37"></tspan><tspan x="1740" y="269.87">temperature 0 • seed 42</tspan><tspan x="1740" y="292.37">strict JSON schema</tspan><tspan x="1740" y="314.87">20s default timeout</tspan><tspan x="1740" y="337.37">≤1 MiB response envelope</tspan></text>
+</g>
+<g>
+  <rect x="40" y="500" width="390" height="220" rx="14" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="235" y="548.62">5. Validate model output</tspan><tspan x="235" y="571.12"></tspan><tspan x="235" y="593.62">Only digest Crumb IDs, code refs and</tspan><tspan x="235" y="616.12">summary reference IDs survive.</tspan><tspan x="235" y="638.62">Drop unsupported diagnoses; clamp ranks</tspan><tspan x="235" y="661.12">and strengths; cap summary at 1200 chars.</tspan><tspan x="235" y="683.62">Hash reuse skips unchanged synthesis.</tspan></text>
+</g>
+<g>
+  <rect x="480" y="500" width="390" height="220" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="675" y="548.62">6. Compose deterministic Case File</tspan><tspan x="675" y="571.12"></tspan><tspan x="675" y="593.62">merge previous + current Crumbs by ID</tspan><tspan x="675" y="616.12">retain ≤500 Crumbs, ≤250 Trail entries</tspan><tspan x="675" y="638.62">source health + links + high-signal count</tspan><tspan x="675" y="661.12">build chronology-based candidate sequence</tspan><tspan x="675" y="683.62">attach AI complete/unavailable state</tspan></text>
+</g>
+<g>
+  <rect x="920" y="500" width="390" height="220" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="1115" y="548.62">7. Final Pattern match</tspan><tspan x="1115" y="571.12"></tspan><tspan x="1115" y="593.62">extract stable Crumb features</tspan><tspan x="1115" y="616.12">generate versioned deterministic Signature</tspan><tspan x="1115" y="638.62">find scoped historical candidates</tspan><tspan x="1115" y="661.12">match or create Pattern</tspan><tspan x="1115" y="683.62">update lifecycle + occurrence history</tspan></text>
+</g>
+<g>
+  <rect x="1360" y="500" width="520" height="220" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="1620" y="559.87">8. One PostgreSQL transaction</tspan><tspan x="1620" y="582.37"></tspan><tspan x="1620" y="604.87">cases.case_file_version + case_file_json</tspan><tspan x="1620" y="627.37">crumbs + trail_entries rows</tspan><tspan x="1620" y="649.87">slack.case-file outbox item</tspan><tspan x="1620" y="672.37">optional +1 minute collecting/stuck check</tspan></text>
+</g>
+<g>
+  <rect x="40" y="850" width="560" height="280" rx="14" fill="#ffe4e6" stroke="#e11d48" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="320" y="906.12">PostgreSQL system of record</tspan><tspan x="320" y="928.62"></tspan><tspan x="320" y="951.12">cases • case_origin_receipts • work_items</tspan><tspan x="320" y="973.62">crumbs • trail_entries • outbox</tspan><tspan x="320" y="996.12">case_signatures • patterns</tspan><tspan x="320" y="1018.62">pattern_occurrences</tspan><tspan x="320" y="1041.12"></tspan><tspan x="320" y="1063.62">Work lease: 2 min; exponential retry ≤60s</tspan><tspan x="320" y="1086.12">Outbox lease: 1 min; exponential retry ≤300s</tspan></text>
+</g>
+<g>
+  <rect x="660" y="850" width="420" height="280" rx="14" fill="#cffafe" stroke="#0891b2" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="870" y="928.62">Web / SignalR</tspan><tspan x="870" y="951.12"></tspan><tspan x="870" y="973.62">Publish CaseUpdated(version, sections)</tspan><tspan x="870" y="996.12">and CaseStatusChanged.</tspan><tspan x="870" y="1018.62">Client joins the Case group, ignores stale</tspan><tspan x="870" y="1041.12">versions, refetches with ETag and uses 5s</tspan><tspan x="870" y="1063.62">polling when disconnected or Case File is pending.</tspan></text>
+</g>
+<g>
+  <rect x="1140" y="820" width="740" height="330" rx="14" fill="#cffafe" stroke="#0891b2" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="1510" y="912.37">Slack — one durable message per Case</tspan><tspan x="1510" y="934.87"></tspan><tspan x="1510" y="957.37">Outbox worker loads the latest committed Case + Case File.</tspan><tspan x="1510" y="979.87">First delivery: chat.postMessage; save returned timestamp. Later: chat.update.</tspan><tspan x="1510" y="1002.37">Blocks include service/state/agent/urgency, Pattern match, up to 3 diverse</tspan><tspan x="1510" y="1024.87">top Crumbs, AI summary or deterministic fallback, candidate sequence,</tspan><tspan x="1510" y="1047.37">source-health icons and a live Case File link. A delayed collecting check may add</tspan><tspan x="1510" y="1069.87">a Rebuild Case File button; Socket Mode acknowledges and queues a fresh work item.</tspan></text>
+</g>
+<g>
+  <rect x="120" y="1210" width="1680" height="90" rx="14" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+  <text font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="500" fill="#172554" text-anchor="middle"><tspan x="960" y="1249.585">Failure behavior: Crumb-source errors become unavailable results; AI errors become synthesis=unavailable; Pattern errors become unavailable.</tspan><tspan x="960" y="1273.335">Slack errors stay in the outbox. None erases the committed deterministic Case File.</tspan></text>
+</g>
+</svg>

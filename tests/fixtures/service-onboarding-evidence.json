@@ -1,0 +1,151 @@
+{
+  "version": 1,
+  "recipeId": "payments-production",
+  "status": "complete",
+  "workload": {
+    "kind": "request-driven",
+    "service": "payments-api",
+    "environment": "production",
+    "sourceRefs": [
+      "deployment-fixture",
+      "grafana-fixture"
+    ]
+  },
+  "sources": [
+    {
+      "id": "deployment-fixture",
+      "kind": "repository-file",
+      "authority": "workload-context",
+      "locator": "fixture:config/recipes.yaml#payments-production",
+      "revision": "fixture-v1"
+    },
+    {
+      "id": "grafana-fixture",
+      "kind": "grafana-dashboard",
+      "authority": "metric-definition",
+      "locator": "fixture:grafana:org=1:dashboard=payments-overview",
+      "revision": "fixture-v1"
+    }
+  ],
+  "metrics": [
+    {
+      "definition": {
+        "id": "availability",
+        "title": "Service availability",
+        "role": "availability",
+        "promQl": "min(up{service=~\"{{serviceRegex}}\",environment=~\"{{environmentRegex}}\"})",
+        "datasourceUid": "prometheus-production",
+        "unit": "ratio",
+        "timeReducer": "minimum",
+        "crumbMode": "anomaly",
+        "requirement": "required",
+        "warningThreshold": 0.999,
+        "criticalThreshold": 0,
+        "direction": "below",
+        "dashboardRow": "Availability"
+      },
+      "provenance": {
+        "semantics": ["grafana-fixture"],
+        "query": ["grafana-fixture"],
+        "scope": ["grafana-fixture"],
+        "datasource": ["grafana-fixture"],
+        "unit": ["grafana-fixture"],
+        "reducer": ["grafana-fixture"],
+        "thresholds": ["grafana-fixture"]
+      },
+      "liveVerification": {
+        "status": "not-run",
+        "sourceRefs": []
+      }
+    },
+    {
+      "definition": {
+        "id": "http-5xx-rate",
+        "title": "HTTP 5xx rate",
+        "role": "errors",
+        "promQl": "sum(rate(http_requests_total{service=~\"{{serviceRegex}}\",environment=~\"{{environmentRegex}}\",status=~\"5..\"}[5m]))",
+        "datasourceUid": "prometheus-production",
+        "unit": "requests/second",
+        "timeReducer": "maximum",
+        "crumbMode": "anomaly",
+        "requirement": "required",
+        "warningThreshold": 1,
+        "criticalThreshold": 5,
+        "direction": "above",
+        "dashboardRow": "Traffic"
+      },
+      "provenance": {
+        "semantics": ["grafana-fixture"],
+        "query": ["grafana-fixture"],
+        "scope": ["grafana-fixture"],
+        "datasource": ["grafana-fixture"],
+        "unit": ["grafana-fixture"],
+        "reducer": ["grafana-fixture"],
+        "thresholds": ["grafana-fixture"]
+      },
+      "liveVerification": {
+        "status": "not-run",
+        "sourceRefs": []
+      }
+    },
+    {
+      "definition": {
+        "id": "latency-p99",
+        "title": "p99 latency",
+        "role": "latency",
+        "promQl": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{service=~\"{{serviceRegex}}\",environment=~\"{{environmentRegex}}\"}[5m])))",
+        "datasourceUid": "prometheus-production",
+        "unit": "seconds",
+        "timeReducer": "maximum",
+        "crumbMode": "anomaly",
+        "requirement": "required",
+        "warningThreshold": 1.5,
+        "criticalThreshold": 3,
+        "direction": "above",
+        "dashboardRow": "Traffic"
+      },
+      "provenance": {
+        "semantics": ["grafana-fixture"],
+        "query": ["grafana-fixture"],
+        "scope": ["grafana-fixture"],
+        "datasource": ["grafana-fixture"],
+        "unit": ["grafana-fixture"],
+        "reducer": ["grafana-fixture"],
+        "thresholds": ["grafana-fixture"]
+      },
+      "liveVerification": {
+        "status": "not-run",
+        "sourceRefs": []
+      }
+    },
+    {
+      "definition": {
+        "id": "request-rate",
+        "title": "Request rate",
+        "role": "traffic",
+        "promQl": "sum(rate(http_requests_total{service=~\"{{serviceRegex}}\",environment=~\"{{environmentRegex}}\"}[5m]))",
+        "datasourceUid": "prometheus-production",
+        "unit": "requests/second",
+        "timeReducer": "maximum",
+        "crumbMode": "context",
+        "requirement": "required",
+        "direction": "",
+        "dashboardRow": "Overview"
+      },
+      "provenance": {
+        "semantics": ["grafana-fixture"],
+        "query": ["grafana-fixture"],
+        "scope": ["grafana-fixture"],
+        "datasource": ["grafana-fixture"],
+        "unit": ["grafana-fixture"],
+        "reducer": ["grafana-fixture"],
+        "thresholds": []
+      },
+      "liveVerification": {
+        "status": "not-run",
+        "sourceRefs": []
+      }
+    }
+  ],
+  "gaps": []
+}

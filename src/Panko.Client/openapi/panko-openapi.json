@@ -1,0 +1,3047 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Panko.Api | v1",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health/live": {
+      "get": {
+        "tags": [
+          "Panko.Api"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "Panko.Api"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/demo": {
+      "get": {
+        "tags": [
+          "Panko.Api"
+        ],
+        "operationId": "GetDemoAvailability",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoAvailability"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases": {
+      "get": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "List recent Cases",
+        "description": "Returns at most 500 Cases visible to the caller.",
+        "operationId": "ListCases",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecentCases"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Create a Case",
+        "description": "Creates a durable Case. Supply Idempotency-Key on every attempt; the idempotencyKey body field is also accepted, and both values must match when supplied.",
+        "operationId": "CreateCase",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateCaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{id}/inputs": {
+      "get": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "List canonical Case inputs",
+        "description": "Returns a bounded audit page of at most 500 inputs.",
+        "operationId": "ListCaseInputs",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfCaseInput"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/demo/reset": {
+      "post": {
+        "tags": [
+          "DemoCaseApi"
+        ],
+        "operationId": "ResetDemo",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoReset"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/catalog": {
+      "get": {
+        "tags": [
+          "Operations catalog"
+        ],
+        "summary": "Browse authorized teams, service collections, and observed services",
+        "operationId": "GetOperationsCatalog",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationsCatalog"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{id}": {
+      "get": {
+        "tags": [
+          "Cases"
+        ],
+        "operationId": "GetCaseFile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseFile"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CasePending"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "304": {
+            "description": "Not Modified"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/cases/{id}/status": {
+      "get": {
+        "tags": [
+          "Cases"
+        ],
+        "operationId": "GetCaseStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseStatus"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/cases/{id}/trail": {
+      "get": {
+        "tags": [
+          "Cases"
+        ],
+        "operationId": "GetCaseTrail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfTrailEntry"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/cases/{id}/crumbs": {
+      "get": {
+        "tags": [
+          "Cases"
+        ],
+        "operationId": "GetCaseCrumbs",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageOfCrumb"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Append Crumbs to a Case",
+        "description": "The batchId is an idempotency key scoped to the Case and authenticated producer. Reusing it with a different payload returns 409 Conflict.",
+        "operationId": "AppendCaseCrumbs",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppendCrumbsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppendCrumbsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pagerduty/incidents": {
+      "get": {
+        "tags": [
+          "PagerDutyPullApi"
+        ],
+        "operationId": "GetRecentPagerDutyIncidents",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecentPagerDutyIncidents"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pagerduty/incidents/{id}/trigger": {
+      "post": {
+        "tags": [
+          "PagerDutyPullApi"
+        ],
+        "operationId": "TriggerPagerDutyIncident",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseTriggerResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{id}/rebuild": {
+      "post": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Queue a deterministic Case File rebuild",
+        "operationId": "RebuildCaseFile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RebuildCaseFileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{id}/refresh-sources": {
+      "post": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Queue a Crumb-source refresh",
+        "operationId": "RefreshCaseSources",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshCaseSourcesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cases/{id}/close": {
+      "post": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Close a Case",
+        "operationId": "CloseCase",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AiDiagnosis": {
+        "required": [
+          "summary",
+          "crumbIds",
+          "codeReferences",
+          "rank",
+          "crumbStrength"
+        ],
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string"
+          },
+          "crumbIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "codeReferences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodeReference"
+            }
+          },
+          "rank": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "crumbStrength": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AiSummaryPart": {
+        "required": [
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "referenceId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "AiSummaryReference": {
+        "required": [
+          "id",
+          "label",
+          "kind",
+          "href"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "href": {
+            "type": "string"
+          }
+        }
+      },
+      "AiSynthesis": {
+        "required": [
+          "status",
+          "summary",
+          "possibleContributors",
+          "unknowns",
+          "recommendedChecks",
+          "crumbHash",
+          "diagnoses",
+          "summaryParts",
+          "summaryReferences"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "possibleContributors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unknowns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recommendedChecks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "crumbHash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "diagnoses": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/AiDiagnosis"
+            }
+          },
+          "summaryParts": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/AiSummaryPart"
+            }
+          },
+          "summaryReferences": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/AiSummaryReference"
+            }
+          }
+        }
+      },
+      "AiSynthesisProgressState": {
+        "enum": [
+          "pending",
+          "running",
+          "complete",
+          "unavailable",
+          "skipped"
+        ]
+      },
+      "AppendCrumbsRequest": {
+        "required": [
+          "batchId",
+          "crumbs"
+        ],
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": "string"
+          },
+          "crumbs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubmittedCrumb"
+            }
+          }
+        }
+      },
+      "AppendCrumbsResponse": {
+        "required": [
+          "accepted",
+          "duplicates",
+          "inputVersion",
+          "projectedInputVersion",
+          "rebuildQueued"
+        ],
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "duplicates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "inputVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectedInputVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rebuildQueued": {
+            "type": "boolean"
+          },
+          "duplicateBatch": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "CaseEarlyCrumb": {
+        "required": [
+          "id",
+          "source",
+          "occurredAt",
+          "severity",
+          "summary",
+          "confidence"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "CaseFile": {
+        "required": [
+          "caseId",
+          "pagerDutyIncidentId",
+          "serviceId",
+          "recipeId",
+          "recipeRevision",
+          "title",
+          "urgency",
+          "pagerDutyState",
+          "status",
+          "openedAt",
+          "updatedAt",
+          "caseFileVersion",
+          "deterministicSummary",
+          "ai",
+          "trail",
+          "crumbs",
+          "crumbSources",
+          "links",
+          "causalMarkers",
+          "pattern"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pagerDutyIncidentId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "serviceId": {
+            "type": "string"
+          },
+          "recipeId": {
+            "type": "string"
+          },
+          "recipeRevision": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "urgency": {
+            "type": "string"
+          },
+          "pagerDutyState": {
+            "$ref": "#/components/schemas/PagerDutyIncidentState"
+          },
+          "status": {
+            "type": "string"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "caseFileVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "deterministicSummary": {
+            "type": "string"
+          },
+          "ai": {
+            "$ref": "#/components/schemas/AiSynthesis"
+          },
+          "trail": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrailEntry"
+            }
+          },
+          "crumbs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Crumb"
+            }
+          },
+          "crumbSources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CrumbSourceStatus"
+            }
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceLink"
+            }
+          },
+          "causalMarkers": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CausalMarker"
+            }
+          },
+          "pattern": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PatternContext"
+              }
+            ]
+          },
+          "origin": {
+            "$ref": "#/components/schemas/CaseOrigin"
+          },
+          "inputVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectedInputVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "CaseInput": {
+        "required": [
+          "id",
+          "sequence",
+          "inputVersion",
+          "clientCrumbId",
+          "producerPrincipal",
+          "receivedAt",
+          "occurredAt",
+          "kind",
+          "category",
+          "severity",
+          "summary",
+          "excerpt",
+          "declaredSource",
+          "sourceReference",
+          "url",
+          "actor",
+          "objectType",
+          "objectId",
+          "attributes",
+          "trustLevel",
+          "supersedesCrumbId",
+          "supersededByCrumbId",
+          "retractedAt",
+          "retractedInputVersion",
+          "active",
+          "projectedInInputVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "inputVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clientCrumbId": {
+            "type": "string"
+          },
+          "producerPrincipal": {
+            "type": "string"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SubmittedCrumbKind"
+          },
+          "category": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "declaredSource": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sourceReference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "actor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "objectType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "objectId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "attributes": {
+            "type": "object"
+          },
+          "trustLevel": {
+            "type": "string"
+          },
+          "supersedesCrumbId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "supersededByCrumbId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "retractedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "retractedInputVersion": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "projectedInInputVersion": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "CaseOrigin": {
+        "required": [
+          "kind",
+          "externalId"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/CaseOriginKind"
+          },
+          "externalId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "CaseOriginKind": {
+        "enum": [
+          "pagerDuty",
+          "agent",
+          "manual"
+        ]
+      },
+      "CasePending": {
+        "required": [
+          "caseId",
+          "pagerDutyIncidentId",
+          "serviceId",
+          "recipeId",
+          "title",
+          "urgency",
+          "pagerDutyState",
+          "status",
+          "openedAt",
+          "updatedAt",
+          "caseFileVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pagerDutyIncidentId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "serviceId": {
+            "type": "string"
+          },
+          "recipeId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "urgency": {
+            "type": "string"
+          },
+          "pagerDutyState": {
+            "$ref": "#/components/schemas/PagerDutyIncidentState"
+          },
+          "status": {
+            "type": "string"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "caseFileVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/CaseOrigin"
+          },
+          "inputVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectedInputVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "CaseProgressPhase": {
+        "enum": [
+          "collecting",
+          "synthesizing",
+          "finalizing",
+          "completed"
+        ]
+      },
+      "CaseProgressProjection": {
+        "required": [
+          "caseId",
+          "attemptId",
+          "revision",
+          "baseCaseFileVersion",
+          "startedAt",
+          "updatedAt",
+          "elapsedDurationMilliseconds",
+          "phase",
+          "currentPass",
+          "currentLookbackMinutes",
+          "deterministicCaseFileUsable",
+          "onlyAiSynthesisRemaining",
+          "aiSynthesisState",
+          "crumbSources",
+          "earlyCrumbs"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attemptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "baseCaseFileVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "elapsedDurationMilliseconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "phase": {
+            "$ref": "#/components/schemas/CaseProgressPhase"
+          },
+          "currentPass": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "currentLookbackMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "deterministicCaseFileUsable": {
+            "type": "boolean"
+          },
+          "onlyAiSynthesisRemaining": {
+            "type": "boolean"
+          },
+          "aiSynthesisState": {
+            "$ref": "#/components/schemas/AiSynthesisProgressState"
+          },
+          "crumbSources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CrumbSourceProgress"
+            }
+          },
+          "earlyCrumbs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseEarlyCrumb"
+            }
+          }
+        }
+      },
+      "CaseStatus": {
+        "required": [
+          "caseId",
+          "status",
+          "pagerDutyState",
+          "caseFileVersion",
+          "updatedAt",
+          "isFrozen"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "pagerDutyState": {
+            "$ref": "#/components/schemas/PagerDutyIncidentState"
+          },
+          "caseFileVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isFrozen": {
+            "type": "boolean"
+          },
+          "inputVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectedInputVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "progress": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CaseProgressProjection"
+              }
+            ]
+          }
+        }
+      },
+      "CaseStatusChanged": {
+        "required": [
+          "caseId",
+          "status",
+          "caseFileVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "caseFileVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "inputVersion": {
+            "type": "integer",
+            "format": "int64",
+            "default": 0
+          },
+          "projectedInputVersion": {
+            "type": "integer",
+            "format": "int64",
+            "default": 0
+          }
+        }
+      },
+      "CaseTriggerResult": {
+        "required": [
+          "caseId",
+          "caseUrl",
+          "duplicate"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseUrl": {
+            "type": "string"
+          },
+          "duplicate": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CaseUpdated": {
+        "required": [
+          "caseId",
+          "caseFileVersion",
+          "changedSections"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseFileVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "changedSections": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "inputVersion": {
+            "type": "integer",
+            "format": "int64",
+            "default": 0
+          },
+          "projectedInputVersion": {
+            "type": "integer",
+            "format": "int64",
+            "default": 0
+          },
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "CausalMarker": {
+        "required": [
+          "id",
+          "category",
+          "label",
+          "occurredAt",
+          "summary",
+          "source",
+          "crumbId",
+          "actor",
+          "url",
+          "objectType",
+          "objectId",
+          "codeReferences"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "crumbId": {
+            "type": "string"
+          },
+          "actor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "objectType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "objectId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "codeReferences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodeReference"
+            }
+          }
+        }
+      },
+      "CodeReference": {
+        "required": [
+          "id",
+          "projectId",
+          "commitSha",
+          "path",
+          "startLine",
+          "endLine",
+          "url",
+          "excerpt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "commitSha": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "startLine": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "endLine": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "url": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateCaseRequest": {
+        "required": [
+          "recipeId",
+          "title",
+          "serviceId",
+          "urgency",
+          "referenceTime"
+        ],
+        "type": "object",
+        "properties": {
+          "recipeId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "serviceId": {
+            "type": "string"
+          },
+          "urgency": {
+            "type": "string"
+          },
+          "referenceTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "labels": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "idempotencyKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "CreateCaseResponse": {
+        "required": [
+          "caseId",
+          "origin",
+          "inputVersion",
+          "projectedInputVersion",
+          "caseFileVersion",
+          "status",
+          "caseUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/CaseOriginKind"
+          },
+          "inputVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectedInputVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "caseFileVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "caseUrl": {
+            "type": "string"
+          },
+          "duplicate": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "Crumb": {
+        "required": [
+          "id",
+          "source",
+          "occurredAt",
+          "endedAt",
+          "category",
+          "severity",
+          "summary",
+          "excerpt",
+          "url",
+          "confidence",
+          "provenance",
+          "actor",
+          "objectType",
+          "objectId",
+          "codeReferences"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "category": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "format": "double"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "actor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "objectType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "objectId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "codeReferences": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CodeReference"
+            }
+          }
+        }
+      },
+      "CrumbSourceHealth": {
+        "enum": [
+          "pending",
+          "complete",
+          "partial",
+          "unavailable",
+          "excluded"
+        ]
+      },
+      "CrumbSourceProgress": {
+        "required": [
+          "source",
+          "requestState",
+          "health",
+          "pass",
+          "lookbackMinutes",
+          "durationMilliseconds",
+          "crumbCount",
+          "diagnostic",
+          "startedAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "requestState": {
+            "$ref": "#/components/schemas/CrumbSourceProgressState"
+          },
+          "health": {
+            "$ref": "#/components/schemas/CrumbSourceHealth"
+          },
+          "pass": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lookbackMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "durationMilliseconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "crumbCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "diagnostic": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CrumbSourceProgressState": {
+        "enum": [
+          "pending",
+          "querying",
+          "received",
+          "timedOut",
+          "failed",
+          "excluded"
+        ]
+      },
+      "CrumbSourceRequestState": {
+        "enum": [
+          "requested",
+          "received",
+          "errored"
+        ]
+      },
+      "CrumbSourceStatus": {
+        "required": [
+          "source",
+          "health",
+          "crumbCount",
+          "durationMilliseconds",
+          "diagnostic",
+          "links",
+          "requestState"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "health": {
+            "$ref": "#/components/schemas/CrumbSourceHealth"
+          },
+          "crumbCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "durationMilliseconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "diagnostic": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceLink"
+            }
+          },
+          "requestState": {
+            "$ref": "#/components/schemas/CrumbSourceRequestState"
+          }
+        }
+      },
+      "DemoAvailability": {
+        "required": [
+          "enabled",
+          "caseId",
+          "caseUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "DemoReset": {
+        "required": [
+          "caseId",
+          "caseUrl",
+          "caseFileVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caseUrl": {
+            "type": "string"
+          },
+          "caseFileVersion": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "JsonObject": {
+        "type": "object"
+      },
+      "ObservedServiceCatalogItem": {
+        "required": [
+          "recipeId",
+          "pagerDutyServiceId"
+        ],
+        "type": "object",
+        "properties": {
+          "recipeId": {
+            "type": "string"
+          },
+          "pagerDutyServiceId": {
+            "type": "string"
+          }
+        }
+      },
+      "OperationsCatalog": {
+        "required": [
+          "teams"
+        ],
+        "type": "object",
+        "properties": {
+          "teams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeamCatalogItem"
+            }
+          }
+        }
+      },
+      "PageOfCaseInput": {
+        "required": [
+          "total",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseInput"
+            }
+          }
+        }
+      },
+      "PageOfCrumb": {
+        "required": [
+          "total",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Crumb"
+            }
+          }
+        }
+      },
+      "PageOfTrailEntry": {
+        "required": [
+          "total",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrailEntry"
+            }
+          }
+        }
+      },
+      "PagerDutyIncidentState": {
+        "enum": [
+          "triggered",
+          "acknowledged",
+          "escalated",
+          "reassigned",
+          "resolved",
+          "unknown"
+        ]
+      },
+      "PatternContext": {
+        "required": [
+          "availability",
+          "algorithmVersion",
+          "stage",
+          "patternKey",
+          "patternId",
+          "lifecycleState",
+          "matchType",
+          "matchScore",
+          "matchedFeatures",
+          "occurrenceCount",
+          "firstSeen",
+          "lastSeen",
+          "recentOccurrences",
+          "possibleMatches",
+          "completeness",
+          "diagnostic"
+        ],
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string"
+          },
+          "algorithmVersion": {
+            "type": "string"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/SignatureStage"
+          },
+          "patternKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "patternId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "lifecycleState": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PatternLifecycleState"
+              }
+            ]
+          },
+          "matchType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "matchScore": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "matchedFeatures": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "occurrenceCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "firstSeen": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastSeen": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "recentOccurrences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PatternOccurrence"
+            }
+          },
+          "possibleMatches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PossiblePatternMatch"
+            }
+          },
+          "completeness": {
+            "type": "number",
+            "format": "double"
+          },
+          "diagnostic": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PatternLifecycleState": {
+        "enum": [
+          "new",
+          "ongoing",
+          "resolved",
+          "regressed",
+          "escalating",
+          null
+        ]
+      },
+      "PatternOccurrence": {
+        "required": [
+          "caseId",
+          "pagerDutyIncidentId",
+          "pagerDutyState",
+          "occurredAt",
+          "updatedAt",
+          "caseUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pagerDutyIncidentId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "pagerDutyState": {
+            "$ref": "#/components/schemas/PagerDutyIncidentState"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "caseUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PossiblePatternMatch": {
+        "required": [
+          "patternKey",
+          "matchType",
+          "score",
+          "matchedFeatures",
+          "lastSeen"
+        ],
+        "type": "object",
+        "properties": {
+          "patternKey": {
+            "type": "string"
+          },
+          "matchType": {
+            "type": "string"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "matchedFeatures": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lastSeen": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RebuildCaseFileResponse": {
+        "required": [
+          "caseId",
+          "targetInputVersion",
+          "rebuildQueued"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "targetInputVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rebuildQueued": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RecentCase": {
+        "required": [
+          "caseId",
+          "origin",
+          "recipeId",
+          "serviceId",
+          "title",
+          "status",
+          "inputVersion",
+          "projectedInputVersion",
+          "caseFileVersion",
+          "createdBy",
+          "updatedAt",
+          "caseUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/CaseOriginKind"
+          },
+          "recipeId": {
+            "type": "string"
+          },
+          "serviceId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "inputVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectedInputVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "caseFileVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "caseUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "RecentCases": {
+        "required": [
+          "total",
+          "cases"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecentCase"
+            }
+          }
+        }
+      },
+      "RecentPagerDutyIncident": {
+        "required": [
+          "id",
+          "incidentNumber",
+          "title",
+          "status",
+          "urgency",
+          "createdAt",
+          "lastStatusChangeAt",
+          "serviceId",
+          "serviceName",
+          "assignees",
+          "htmlUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "incidentNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "urgency": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastStatusChangeAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "serviceId": {
+            "type": "string"
+          },
+          "serviceName": {
+            "type": "string"
+          },
+          "assignees": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "htmlUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RecentPagerDutyIncidents": {
+        "required": [
+          "since",
+          "until",
+          "hasMore",
+          "incidents"
+        ],
+        "type": "object",
+        "properties": {
+          "since": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "incidents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecentPagerDutyIncident"
+            }
+          }
+        }
+      },
+      "RefreshCaseSourcesResponse": {
+        "required": [
+          "caseId",
+          "targetInputVersion",
+          "refreshQueued"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "targetInputVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "refreshQueued": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ServiceCollectionCatalogItem": {
+        "required": [
+          "id",
+          "services"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObservedServiceCatalogItem"
+            }
+          }
+        }
+      },
+      "SignatureStage": {
+        "enum": [
+          "provisional",
+          "final"
+        ]
+      },
+      "SourceLink": {
+        "required": [
+          "label",
+          "url"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "SubmittedCrumb": {
+        "required": [
+          "clientCrumbId",
+          "kind",
+          "occurredAt",
+          "category",
+          "severity",
+          "summary"
+        ],
+        "type": "object",
+        "properties": {
+          "clientCrumbId": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SubmittedCrumbKind"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "category": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "declaredSource": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sourceReference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "actor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "objectType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "objectId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "attributes": {
+            "type": [
+              "null",
+              "object"
+            ]
+          },
+          "supersedesClientCrumbId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SubmittedCrumbKind": {
+        "enum": [
+          "event",
+          "crumb",
+          "note"
+        ]
+      },
+      "TeamCatalogItem": {
+        "required": [
+          "id",
+          "serviceCollections"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "serviceCollections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceCollectionCatalogItem"
+            }
+          }
+        }
+      },
+      "TrailEntry": {
+        "required": [
+          "id",
+          "occurredAt",
+          "source",
+          "kind",
+          "summary",
+          "severity",
+          "url",
+          "actor",
+          "objectType",
+          "objectId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "actor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "objectType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "objectId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Panko.Api"
+    },
+    {
+      "name": "DemoCaseApi"
+    },
+    {
+      "name": "Cases"
+    },
+    {
+      "name": "Operations catalog"
+    },
+    {
+      "name": "PagerDutyPullApi"
+    }
+  ]
+}

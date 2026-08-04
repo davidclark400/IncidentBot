@@ -22,16 +22,16 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: src/IncidentBot.Client/package-lock.json
+          cache-dependency-path: src/Panko.Client/package-lock.json
 
       - name: Install TypeScript generator
         run: npm ci
-        working-directory: src/IncidentBot.Client
+        working-directory: src/Panko.Client
 
       - name: Generate OpenAPI and TypeScript contracts
-        run: dotnet build src/IncidentBot.Api/IncidentBot.Api.csproj -p:BuildClient=false
+        run: dotnet build src/Panko.Api/Panko.Api.csproj -p:BuildClient=false
 
       - name: Verify generated contracts are committed
         run: |
-          npm run contracts:check --prefix src/IncidentBot.Client
-          git diff --exit-code -- src/IncidentBot.Client/openapi src/IncidentBot.Client/src/api-client
+          npm run contracts:check --prefix src/Panko.Client
+          git diff --exit-code -- src/Panko.Client/openapi src/Panko.Client/src/api-client

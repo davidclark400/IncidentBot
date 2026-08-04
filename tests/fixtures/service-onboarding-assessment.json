@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "recipeId": "payments-production",
+  "decision": "reuse",
+  "contract": "request-driven-v1",
+  "selectedMetricPackId": "example-prometheus-http-v1",
+  "matchingMetricPackIds": [
+    "example-prometheus-http-v1"
+  ],
+  "thresholdOverrides": {},
+  "roleMappings": [
+    {
+      "role": "availability",
+      "evidenceMetricId": "availability",
+      "packMetricId": "availability",
+      "sourceRefs": [
+        "grafana-fixture"
+      ]
+    },
+    {
+      "role": "errors",
+      "evidenceMetricId": "http-5xx-rate",
+      "packMetricId": "http-5xx-rate",
+      "sourceRefs": [
+        "grafana-fixture"
+      ]
+    },
+    {
+      "role": "latency",
+      "evidenceMetricId": "latency-p99",
+      "packMetricId": "latency-p99",
+      "sourceRefs": [
+        "grafana-fixture"
+      ]
+    },
+    {
+      "role": "traffic",
+      "evidenceMetricId": "request-rate",
+      "packMetricId": "request-rate",
+      "sourceRefs": [
+        "grafana-fixture"
+      ]
+    }
+  ],
+  "blockers": [],
+  "outstandingLiveVerification": [
+    "availability",
+    "http-5xx-rate",
+    "latency-p99",
+    "request-rate"
+  ],
+  "proposedMetrics": []
+}
