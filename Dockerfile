@@ -1,23 +1,25 @@
 FROM node:24-alpine AS client
 WORKDIR /src
-COPY src/IncidentBot.Client/package.json src/IncidentBot.Client/package-lock.json src/IncidentBot.Client/
-RUN npm ci --prefix src/IncidentBot.Client
-COPY src/IncidentBot.Client src/IncidentBot.Client
-RUN npm run build --prefix src/IncidentBot.Client
+COPY src/Panko.Client/package.json src/Panko.Client/package-lock.json src/Panko.Client/
+RUN npm ci --prefix src/Panko.Client
+COPY src/Panko.Client src/Panko.Client
+RUN npm run build --prefix src/Panko.Client
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
-COPY global.json IncidentBot.sln ./
-COPY src/IncidentBot.Api/IncidentBot.Api.csproj src/IncidentBot.Api/
-COPY src/IncidentBot.Contracts/IncidentBot.Contracts.csproj src/IncidentBot.Contracts/
-COPY src/IncidentBot.Kafka/IncidentBot.Kafka.csproj src/IncidentBot.Kafka/
-RUN dotnet restore src/IncidentBot.Api/IncidentBot.Api.csproj
-COPY src/IncidentBot.Api src/IncidentBot.Api
-COPY src/IncidentBot.Contracts src/IncidentBot.Contracts
-COPY src/IncidentBot.Kafka src/IncidentBot.Kafka
+COPY global.json Panko.sln ./
+COPY src/Panko.Api/Panko.Api.csproj src/Panko.Api/
+COPY src/Panko.Contracts/Panko.Contracts.csproj src/Panko.Contracts/
+COPY src/Panko.Kafka/Panko.Kafka.csproj src/Panko.Kafka/
+COPY src/Panko.Observability/Panko.Observability.csproj src/Panko.Observability/
+RUN dotnet restore src/Panko.Api/Panko.Api.csproj
+COPY src/Panko.Api src/Panko.Api
+COPY src/Panko.Contracts src/Panko.Contracts
+COPY src/Panko.Kafka src/Panko.Kafka
+COPY src/Panko.Observability src/Panko.Observability
 COPY config config
-COPY --from=client /src/src/IncidentBot.Api/wwwroot src/IncidentBot.Api/wwwroot
-RUN dotnet publish src/IncidentBot.Api/IncidentBot.Api.csproj -c Release -o /app/publish \
+COPY --from=client /src/src/Panko.Api/wwwroot src/Panko.Api/wwwroot
+RUN dotnet publish src/Panko.Api/Panko.Api.csproj -c Release -o /app/publish \
     -p:BuildClient=false \
     -p:GenerateTypeScriptContracts=false \
     -p:OpenApiGenerateDocuments=false \
@@ -33,4 +35,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=3s --retries=6 \
     CMD curl --fail --silent --show-error http://127.0.0.1:8080/health/ready >/dev/null || exit 1
 USER $APP_UID
-ENTRYPOINT ["dotnet", "IncidentBot.Api.dll"]
+ENTRYPOINT ["dotnet", "Panko.Api.dll"]

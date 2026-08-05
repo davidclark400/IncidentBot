@@ -1,5 +1,5 @@
 {
-  "IncidentBot": {
-    "PublicBaseUrl": "https://incident-bot.internal"
+  "Panko": {
+    "PublicBaseUrl": "https://panko.internal"
   }
 }

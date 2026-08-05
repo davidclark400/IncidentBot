@@ -1,0 +1,9 @@
+version: 3
+revision: "production-smoke-v1"
+fallbackSlackChannel: "#panko-smoke"
+
+recipes:
+  - id: production-smoke
+    pagerDutyServiceId: PSMOKE
+    team: platform
+    slackChannel: "#panko-smoke"

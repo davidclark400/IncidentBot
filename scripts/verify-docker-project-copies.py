@@ -12,7 +12,7 @@ from xml.etree import ElementTree
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCKERFILE = ROOT / "Dockerfile"
-API_PROJECT = ROOT / "src/IncidentBot.Api/IncidentBot.Api.csproj"
+API_PROJECT = ROOT / "src/Panko.Api/Panko.Api.csproj"
 
 
 def repository_relative(path: Path) -> str:

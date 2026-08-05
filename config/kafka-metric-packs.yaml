@@ -10,12 +10,12 @@ packs:
       - id: topic-message-rate
         title: Topic message rate
         category: kafka-topic-message-rate
-        promQl: 'sum(rate(incidentbot_fixture_kafka_topic_messages_total{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}"}[5m]))'
+        promQl: 'sum(rate(panko_fixture_kafka_topic_messages_total{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}"}[5m]))'
         datasourceUid: synthetic-prometheus
         resourceScope: topic
         unit: messages/s
         timeReducer: average
-        evidenceMode: context
+        crumbMode: context
         requirement: required
         warningThreshold: 1000000
         criticalThreshold: 2000000
@@ -24,12 +24,12 @@ packs:
       - id: topic-byte-rate
         title: Topic byte rate
         category: kafka-topic-byte-rate
-        promQl: 'sum(rate(incidentbot_fixture_kafka_topic_bytes_total{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}"}[5m]))'
+        promQl: 'sum(rate(panko_fixture_kafka_topic_bytes_total{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}"}[5m]))'
         datasourceUid: synthetic-prometheus
         resourceScope: topic
         unit: bytes/s
         timeReducer: average
-        evidenceMode: context
+        crumbMode: context
         requirement: required
         warningThreshold: 1000000000
         criticalThreshold: 2000000000
@@ -38,12 +38,12 @@ packs:
       - id: broker-availability
         title: Available brokers
         category: kafka-broker-availability
-        promQl: 'sum(incidentbot_fixture_kafka_broker_up{cluster=~"{{clusterRegex}}"})'
+        promQl: 'sum(panko_fixture_kafka_broker_up{cluster=~"{{clusterRegex}}"})'
         datasourceUid: synthetic-prometheus
         resourceScope: cluster
         unit: brokers
         timeReducer: minimum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: required
         warningThreshold: 2
         criticalThreshold: 1
@@ -52,12 +52,12 @@ packs:
       - id: offline-partitions
         title: Offline partitions
         category: kafka-offline-partitions
-        promQl: 'sum(incidentbot_fixture_kafka_offline_partitions{cluster=~"{{clusterRegex}}"})'
+        promQl: 'sum(panko_fixture_kafka_offline_partitions{cluster=~"{{clusterRegex}}"})'
         datasourceUid: synthetic-prometheus
         resourceScope: cluster
         unit: partitions
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: required
         warningThreshold: 1
         criticalThreshold: 2
@@ -66,12 +66,12 @@ packs:
       - id: under-replicated-partitions
         title: Under-replicated partitions
         category: kafka-under-replicated-partitions
-        promQl: 'sum(incidentbot_fixture_kafka_under_replicated_partitions{cluster=~"{{clusterRegex}}"})'
+        promQl: 'sum(panko_fixture_kafka_under_replicated_partitions{cluster=~"{{clusterRegex}}"})'
         datasourceUid: synthetic-prometheus
         resourceScope: cluster
         unit: partitions
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: required
         warningThreshold: 1
         criticalThreshold: 10
@@ -80,12 +80,12 @@ packs:
       - id: isr-shrink-rate
         title: ISR shrink rate
         category: kafka-isr-state
-        promQl: 'sum(rate(incidentbot_fixture_kafka_isr_shrinks_total{cluster=~"{{clusterRegex}}"}[5m]))'
+        promQl: 'sum(rate(panko_fixture_kafka_isr_shrinks_total{cluster=~"{{clusterRegex}}"}[5m]))'
         datasourceUid: synthetic-prometheus
         resourceScope: cluster
         unit: operations/s
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 0.1
         criticalThreshold: 1
@@ -94,12 +94,12 @@ packs:
       - id: leader-count
         title: Active partition leaders
         category: kafka-leader-state
-        promQl: 'sum(incidentbot_fixture_kafka_partition_leaders{cluster=~"{{clusterRegex}}"})'
+        promQl: 'sum(panko_fixture_kafka_partition_leaders{cluster=~"{{clusterRegex}}"})'
         datasourceUid: synthetic-prometheus
         resourceScope: cluster
         unit: leaders
         timeReducer: minimum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 1
         criticalThreshold: 0
@@ -108,12 +108,12 @@ packs:
       - id: consumer-lag
         title: Consumer lag
         category: kafka-consumer-lag
-        promQl: 'max(incidentbot_fixture_kafka_consumer_lag{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}",consumer_group=~"{{consumerGroupRegex}}"})'
+        promQl: 'max(panko_fixture_kafka_consumer_lag{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}",consumer_group=~"{{consumerGroupRegex}}"})'
         datasourceUid: synthetic-prometheus
         resourceScope: consumer-group
         unit: messages
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 1000
         criticalThreshold: 10000
@@ -122,12 +122,12 @@ packs:
       - id: consumer-lag-growth
         title: Consumer lag growth
         category: kafka-consumer-lag-growth
-        promQl: 'max(deriv(incidentbot_fixture_kafka_consumer_lag{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}",consumer_group=~"{{consumerGroupRegex}}"}[5m]))'
+        promQl: 'max(deriv(panko_fixture_kafka_consumer_lag{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}",consumer_group=~"{{consumerGroupRegex}}"}[5m]))'
         datasourceUid: synthetic-prometheus
         resourceScope: consumer-group
         unit: messages/s
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 10
         criticalThreshold: 100
@@ -136,12 +136,12 @@ packs:
       - id: consumer-members
         title: Consumer group members
         category: kafka-consumer-membership
-        promQl: 'min(incidentbot_fixture_kafka_consumer_group_members{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}",consumer_group=~"{{consumerGroupRegex}}"})'
+        promQl: 'min(panko_fixture_kafka_consumer_group_members{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}",consumer_group=~"{{consumerGroupRegex}}"})'
         datasourceUid: synthetic-prometheus
         resourceScope: consumer-group
         unit: members
         timeReducer: minimum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 1
         criticalThreshold: 0
@@ -150,12 +150,12 @@ packs:
       - id: consumer-rebalances
         title: Consumer rebalance rate
         category: kafka-consumer-rebalances
-        promQl: 'sum(rate(incidentbot_fixture_kafka_consumer_rebalances_total{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}",consumer_group=~"{{consumerGroupRegex}}"}[5m]))'
+        promQl: 'sum(rate(panko_fixture_kafka_consumer_rebalances_total{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}",consumer_group=~"{{consumerGroupRegex}}"}[5m]))'
         datasourceUid: synthetic-prometheus
         resourceScope: consumer-group
         unit: operations/s
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 0.1
         criticalThreshold: 1
@@ -164,12 +164,12 @@ packs:
       - id: consumer-commit-errors
         title: Consumer commit error rate
         category: kafka-consumer-commit-errors
-        promQl: 'sum(rate(incidentbot_fixture_kafka_consumer_commit_errors_total{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}",consumer_group=~"{{consumerGroupRegex}}"}[5m]))'
+        promQl: 'sum(rate(panko_fixture_kafka_consumer_commit_errors_total{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}",consumer_group=~"{{consumerGroupRegex}}"}[5m]))'
         datasourceUid: synthetic-prometheus
         resourceScope: consumer-group
         unit: errors/s
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 0.1
         criticalThreshold: 1
@@ -178,12 +178,12 @@ packs:
       - id: consumer-fetch-errors
         title: Consumer fetch error rate
         category: kafka-consumer-fetch-errors
-        promQl: 'sum(rate(incidentbot_fixture_kafka_consumer_fetch_errors_total{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}",consumer_group=~"{{consumerGroupRegex}}"}[5m]))'
+        promQl: 'sum(rate(panko_fixture_kafka_consumer_fetch_errors_total{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}",consumer_group=~"{{consumerGroupRegex}}"}[5m]))'
         datasourceUid: synthetic-prometheus
         resourceScope: consumer-group
         unit: errors/s
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 0.1
         criticalThreshold: 1
@@ -192,12 +192,12 @@ packs:
       - id: producer-send-rate
         title: Producer send rate
         category: kafka-producer-send-rate
-        promQl: 'sum(rate(incidentbot_fixture_kafka_producer_records_sent_total{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}"}[5m]))'
+        promQl: 'sum(rate(panko_fixture_kafka_producer_records_sent_total{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}"}[5m]))'
         datasourceUid: synthetic-prometheus
         resourceScope: topic
         unit: messages/s
         timeReducer: average
-        evidenceMode: context
+        crumbMode: context
         requirement: optional
         warningThreshold: 1000000
         criticalThreshold: 2000000
@@ -206,12 +206,12 @@ packs:
       - id: producer-errors
         title: Producer error rate
         category: kafka-producer-errors
-        promQl: 'sum(rate(incidentbot_fixture_kafka_producer_errors_total{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}"}[5m]))'
+        promQl: 'sum(rate(panko_fixture_kafka_producer_errors_total{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}"}[5m]))'
         datasourceUid: synthetic-prometheus
         resourceScope: topic
         unit: errors/s
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 0.1
         criticalThreshold: 1
@@ -220,12 +220,12 @@ packs:
       - id: producer-retries
         title: Producer retry rate
         category: kafka-producer-retries
-        promQl: 'sum(rate(incidentbot_fixture_kafka_producer_retries_total{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}"}[5m]))'
+        promQl: 'sum(rate(panko_fixture_kafka_producer_retries_total{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}"}[5m]))'
         datasourceUid: synthetic-prometheus
         resourceScope: topic
         unit: retries/s
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 1
         criticalThreshold: 10
@@ -234,12 +234,12 @@ packs:
       - id: producer-latency
         title: Producer request latency
         category: kafka-producer-latency
-        promQl: 'max(incidentbot_fixture_kafka_producer_request_latency_seconds{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}"})'
+        promQl: 'max(panko_fixture_kafka_producer_request_latency_seconds{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}"})'
         datasourceUid: synthetic-prometheus
         resourceScope: topic
         unit: seconds
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 0.5
         criticalThreshold: 2
@@ -248,12 +248,12 @@ packs:
       - id: producer-throttle
         title: Producer throttle time
         category: kafka-producer-throttle
-        promQl: 'max(incidentbot_fixture_kafka_producer_throttle_seconds{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}"})'
+        promQl: 'max(panko_fixture_kafka_producer_throttle_seconds{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}"})'
         datasourceUid: synthetic-prometheus
         resourceScope: topic
         unit: seconds
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 0.1
         criticalThreshold: 1
@@ -262,12 +262,12 @@ packs:
       - id: producer-buffer-pressure
         title: Producer buffer pressure
         category: kafka-producer-buffer-pressure
-        promQl: 'max(incidentbot_fixture_kafka_producer_buffer_ratio{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}"})'
+        promQl: 'max(panko_fixture_kafka_producer_buffer_ratio{cluster=~"{{clusterRegex}}",topic=~"{{topicRegex}}"})'
         datasourceUid: synthetic-prometheus
         resourceScope: topic
         unit: ratio
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 0.8
         criticalThreshold: 0.95
@@ -276,12 +276,12 @@ packs:
       - id: broker-request-latency
         title: Broker request latency
         category: kafka-broker-latency
-        promQl: 'max(incidentbot_fixture_kafka_broker_request_latency_seconds{cluster=~"{{clusterRegex}}"})'
+        promQl: 'max(panko_fixture_kafka_broker_request_latency_seconds{cluster=~"{{clusterRegex}}"})'
         datasourceUid: synthetic-prometheus
         resourceScope: cluster
         unit: seconds
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 0.5
         criticalThreshold: 2
@@ -290,12 +290,12 @@ packs:
       - id: broker-throttle
         title: Broker throttle time
         category: kafka-broker-throttle
-        promQl: 'max(incidentbot_fixture_kafka_broker_throttle_seconds{cluster=~"{{clusterRegex}}"})'
+        promQl: 'max(panko_fixture_kafka_broker_throttle_seconds{cluster=~"{{clusterRegex}}"})'
         datasourceUid: synthetic-prometheus
         resourceScope: cluster
         unit: seconds
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 0.1
         criticalThreshold: 1
@@ -304,12 +304,12 @@ packs:
       - id: leader-election-rate
         title: Leader election rate
         category: kafka-election-state
-        promQl: 'sum(rate(incidentbot_fixture_kafka_leader_elections_total{cluster=~"{{clusterRegex}}"}[5m]))'
+        promQl: 'sum(rate(panko_fixture_kafka_leader_elections_total{cluster=~"{{clusterRegex}}"}[5m]))'
         datasourceUid: synthetic-prometheus
         resourceScope: cluster
         unit: operations/s
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 0.1
         criticalThreshold: 1
@@ -318,12 +318,12 @@ packs:
       - id: jvm-heap-pressure
         title: JVM heap pressure
         category: kafka-jvm-heap
-        promQl: 'max(incidentbot_fixture_kafka_jvm_heap_ratio{cluster=~"{{clusterRegex}}"})'
+        promQl: 'max(panko_fixture_kafka_jvm_heap_ratio{cluster=~"{{clusterRegex}}"})'
         datasourceUid: synthetic-prometheus
         resourceScope: cluster
         unit: ratio
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 0.8
         criticalThreshold: 0.95
@@ -332,12 +332,12 @@ packs:
       - id: jvm-gc-pause
         title: JVM GC pause
         category: kafka-jvm-gc
-        promQl: 'max(incidentbot_fixture_kafka_jvm_gc_pause_seconds{cluster=~"{{clusterRegex}}"})'
+        promQl: 'max(panko_fixture_kafka_jvm_gc_pause_seconds{cluster=~"{{clusterRegex}}"})'
         datasourceUid: synthetic-prometheus
         resourceScope: cluster
         unit: seconds
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 0.2
         criticalThreshold: 1
@@ -346,12 +346,12 @@ packs:
       - id: jvm-cpu-pressure
         title: JVM CPU pressure
         category: kafka-jvm-cpu
-        promQl: 'max(incidentbot_fixture_kafka_jvm_cpu_ratio{cluster=~"{{clusterRegex}}"})'
+        promQl: 'max(panko_fixture_kafka_jvm_cpu_ratio{cluster=~"{{clusterRegex}}"})'
         datasourceUid: synthetic-prometheus
         resourceScope: cluster
         unit: ratio
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 0.8
         criticalThreshold: 0.95
@@ -360,12 +360,12 @@ packs:
       - id: jvm-thread-pressure
         title: JVM thread count
         category: kafka-jvm-threads
-        promQl: 'max(incidentbot_fixture_kafka_jvm_threads{cluster=~"{{clusterRegex}}"})'
+        promQl: 'max(panko_fixture_kafka_jvm_threads{cluster=~"{{clusterRegex}}"})'
         datasourceUid: synthetic-prometheus
         resourceScope: cluster
         unit: threads
         timeReducer: maximum
-        evidenceMode: anomaly
+        crumbMode: anomaly
         requirement: optional
         warningThreshold: 1000
         criticalThreshold: 2000

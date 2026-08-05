@@ -1,0 +1,4 @@
+interface:
+  display_name: "Panko Service Preparation"
+  short_description: "Prepare an existing service for Panko Cases"
+  default_prompt: "Use $panko-skill to prepare payments-api for Panko casework."

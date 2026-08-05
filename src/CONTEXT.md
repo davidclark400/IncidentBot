@@ -1,208 +1,109 @@
-# IncidentBot Domain Context
+# Panko Domain Context
 
-This file defines the domain language and invariants used across IncidentBot. It is a navigation aid, not an architecture decision record. Proposed refactors and implementation details belong elsewhere.
+Panko helps responders turn operational signals into a durable, source-grounded understanding of an active issue. Its language follows the product metaphor: individual observations are crumbs, their ordered story is a trail, and the complete responder view is a case file.
 
-## Product purpose
+## Language
 
-IncidentBot accepts PagerDuty incident events, collects evidence from configured operational sources, builds a live investigation report, and publishes updates to the web client and Slack.
+### Core casework
 
-The investigation must remain useful when a source, recurrence matching, or the required AI synthesis service is unavailable.
+**Case**:
+The primary Panko aggregate for one operational issue. A case may originate from a PagerDuty incident, an agent, or a responder, and owns its inputs, processing state, Case File, and team identity.
 
-## Core terms
+**Case origin**:
+The trusted channel that opened a Case and, when present, its external identity. PagerDuty, agent, and manual are the supported origins.
 
-### Incident
+**Case state**:
+The responder lifecycle of a Case, distinct from Panko's processing progress. For a PagerDuty-originated Case it reflects the PagerDuty incident lifecycle.
 
-An operational event received from PagerDuty. An incident has a stable internal ID, a PagerDuty incident ID, service and profile identity, responder-facing state, investigation status, timestamps, labels, and report version.
+**Case admission**:
+The idempotent acceptance of an origin event or snapshot into a Case. Admission selects a Recipe, retains only approved labels, snapshots team ownership, and schedules durable work.
 
-PagerDuty state and investigation status are different concepts:
+**Case progress**:
+The live, lightweight view of work currently being performed for a Case. It describes collection, synthesis, and publication without duplicating the Case File's Crumbs.
 
-- **Incident state** describes the responder lifecycle: triggered, acknowledged, escalated, reassigned, resolved, or unknown.
-- **Investigation status** describes IncidentBot's processing progress, such as queued, collecting, ready, or resolved.
+**Case File**:
+The versioned responder-facing projection of a Case. It contains deterministic status and summary information, Crumbs, a Trail, source health, links, AI synthesis, causal context, and Pattern context.
 
-An incident may become **frozen** when resolved. Frozen incidents preserve their final responder-facing report while the durable workflow finishes any required finalization.
+**Case File transition**:
+A committed move from one Case File version to the next. Versions increase monotonically, and a stale transition cannot replace a newer Case File.
 
-### Incident intake
+### Collected knowledge
 
-The acceptance of a PagerDuty event or incident snapshot into IncidentBot. Incident intake selects the investigation profile, retains only profile-approved labels, and schedules idempotent investigation work; transport validation and PagerDuty retrieval occur before intake.
+**Crumb**:
+A bounded, source-attributed atomic observation collected or submitted for a Case. A Crumb has a stable identity, occurrence time, category, severity, summary, confidence, provenance, and optional supporting detail.
 
-### Investigation
+**Crumb source**:
+An operational system from which Panko may collect Crumbs. Current sources are PagerDuty, Nomad, Consul, GitLab, Grafana, Kafka, and VictoriaLogs.
 
-The durable workflow that turns an incident into an investigation report. It resolves an investigation profile, evaluates recurrence, collects evidence, performs AI synthesis, composes a report, persists it, and publishes versioned updates.
+**Crumb source health**:
+The collection outcome for one Crumb source: pending, complete, partial, unavailable, or excluded. One unhealthy source cannot prevent the Case File from completing.
 
-Repeated work for the same incident must be safe. Concurrent report updates use version checks and are retried through the durable work queue.
+**Adaptive crumb window**:
+A bounded collection period that expands into older, non-overlapping rings while accumulated Crumbs remain deterministically inconclusive. Stable snapshots are not repeatedly queried, and all retained results remain within item and byte limits.
 
-### Investigation profile
+**Trail**:
+The ordered Case File projection of source-attributed events that help responders understand what changed. Trail order establishes chronology, not causation.
 
-Configuration selected from the incident's service identity and labels. A profile determines which evidence sources are enabled, their allowed scope, and the Slack destination. Evidence-source endpoints and transports are application configuration, not profile configuration.
+**Causal marker**:
+A Case File projection of a Crumb that may help explain a candidate causal sequence. A causal marker must remain source-grounded and cannot turn chronology alone into a causal claim.
 
-Profile revision is included in evidence scope and reports so responders can identify the configuration used for an investigation.
+### Configuration and identity
 
-### Evidence source
+**Recipe**:
+Configuration selected from a Case's observed service identity and approved labels. A Recipe defines enabled Crumb sources, allowed resource scope, team ownership, and publication destination; endpoints and transports remain deployment configuration.
 
-An operational system from which incident evidence may be collected. Current sources are PagerDuty, Nomad, GitLab, Grafana, Kafka, and VictoriaLogs.
+**Observed service**:
+The responder-owned workload represented by one Recipe in one deployment environment. It may have many distributed instances and is distinct from a PagerDuty service or Consul service.
 
-Each source returns a connector result containing:
+**Service collection**:
+A team-owned grouping of observed services that responders browse and operate together. Its identity is scoped to its team, and each observed service belongs to exactly one collection.
 
-- source health;
-- evidence findings;
-- timeline candidates;
-- responder links;
-- collection duration;
-- a bounded diagnostic when collection is incomplete.
+**Team ownership**:
+The canonical authorization owner of a service collection, Recipe, Case, and Pattern. A Case snapshots its Recipe's team at admission, so later Recipe changes cannot transfer its history.
 
-Source health is complete, partial, unavailable, excluded, or pending. Failure of one source must not prevent the other sources or the investigation report from completing.
+**Signature**:
+A deterministic, versioned representation of stable Case features used for equality and Pattern matching. Dynamic identifiers, timestamps, secrets, and unbounded source content cannot influence a Signature.
 
-Source request state is separate from health: `requested` means the connector call has been sent and is awaiting a response, `received` means the connector returned (including a partial result), and `errored` means the source was unavailable. Every collection pass republishes `requested` before its connector calls start.
+**Provisional signature**:
+A Signature built before Crumb collection completes. It may suggest historical matches but is not authoritative when collection is enabled.
 
-An **adaptive evidence window** begins at the configured lookback and expands exponentially to a bounded maximum while the accumulated evidence remains deterministically inconclusive. The initial scope ends at one fixed collection time; each expansion queries only the disjoint older ring between the previous and new lookback. Window-sensitive connectors may be queried again; exact/current snapshot connectors are not. Collection stops only for an explicit structured failure, temporally close high-signal findings from distinct sources, or a change that precedes a recent failure signal. Otherwise it records a bounded inconclusive outcome at the maximum window or when no source can expand. Findings from every ring remain available, while stable aggregate snapshots are combined, cumulative retained results stay within item and byte limits, and synthesis may semantically compress repetitive evidence without removing the auditable report evidence.
+**Final signature**:
+The authoritative Signature built from the complete retained Crumb set for a Case.
 
-### Connector
+**Family signature**:
+A Signature value that identifies a stable failure family across Cases.
 
-An adapter that collects evidence from one evidence source. A connector may use a native HTTP transport or an MCP transport, subject to the same configured scope, item limits, cumulative source byte limit, timeout policy, and source identity. Exhausting a reserved byte or item budget produces partial source health rather than unbounded collection.
+**Exact signature**:
+The strongest deterministic equality value within one Signature algorithm version. Values from different algorithm versions cannot silently compare as exact.
 
-Kafka v1 is an explicit exception to transport variability: it is API-only and reads reviewed metric packs through Grafana `/api/ds/query`. It never connects to brokers. Kafka queries are sorted and batched with at most eight targets, use only escaped profile allowlists, and reject returned resource labels outside that scope. Metric packs are shared by runtime collection and deterministic dashboard generation.
+**Pattern**:
+A persistent, team-owned grouping of recurring Cases that share a deterministic failure identity. A Pattern records its key, representative Signature, occurrence history, and lifecycle.
 
-A **Kafka metric plan** is the immutable, profile-scoped resolution of one reviewed metric pack. It carries the safe runtime and dashboard queries, effective thresholds, and expected resource-label scope used by both evidence collection and deterministic dashboard generation; every data selector carries all resource scopes applicable to its metric.
+**Pattern match**:
+An explainable comparison between a Case Signature and historical Pattern candidates. It records the match type, score, and matched features independently of AI synthesis.
 
-GitLab pipeline collection treats a pipeline as a parent evidence group. Current failed jobs are queried before canceled fanout, hard failed non-allowed job families outrank allowed failures and aggregated downstream cancellations, retries are collapsed without reviving recovered jobs, and trace budgets are shared fairly across selected job families. The earliest hard failure carries a structured ordinal so an upstream failure remains ahead of a closer cascading sibling.
+**Pattern lifecycle**:
+The deterministic state of a Pattern: new, ongoing, resolved, regressed, or escalating. It derives from persisted Case occurrences and states.
 
-MCP output must prove membership in the profile's allowed resource scope using source-specific structured provenance (for example GitLab project and pipeline, or Nomad namespace and job). Same-host but out-of-scope findings are rejected. Responder URLs are deny-by-default without a trusted root and are retained only when they also match an allowed resource.
+### Supporting concepts
 
-Connector responses and external text are untrusted data. Credentials are read from configured environment variables and must not appear in evidence, provenance, diagnostics, logs, fingerprints, or reports.
+**AI synthesis**:
+A required, source-grounded interpretation attempted from a bounded digest of Crumbs. Failure is explicit and cannot suppress the deterministic Case File or determine Case identity, Signature equality, Pattern association, or lifecycle.
 
-### Evidence finding
+**Durable work item**:
+Persisted work that runs or repeats Case processing. Work items are leased, retried after failure, and completed idempotently where possible.
 
-A bounded, source-attributed observation collected during an investigation. A finding includes a deterministic ID, occurrence time, category, severity, summary, confidence, provenance, and optional excerpt, source URL, actor, object identity, and code references.
+**Outbox item**:
+Persisted publication work created with a Case File transition so delivery can be retried without losing the committed Case File.
 
-Evidence IDs and code-reference IDs are stable citation targets for synthesis and report presentation.
+**Slack Case File publication**:
+A durable intent to refresh a Case's single Slack message from its latest committed Case File. Delivery is at-least-once and repeat updates target the confirmed Slack message.
 
-Evidence severity, confidence, relevance, and presentation priority are distinct concepts. High-volume groups must not crowd independent sources out of the report, Slack, or synthesis input.
+**Security audit event**:
+An immutable record of a security-sensitive access decision or request. It identifies the action, outcome, actor, target team, and resource without retaining Case File content, credentials, or prompt text.
 
-### Timeline candidate
+**Demo mode**:
+A self-contained adapter that demonstrates the live Case File experience without external operational systems. Demo behavior preserves production responder concepts and contracts.
 
-A source-attributed event that may appear in the incident timeline. Timeline order indicates chronology, not causation.
-
-### Causal event
-
-A report projection of evidence that may help explain the incident's candidate causal sequence. Causal language must remain evidence-grounded; chronology alone is not proof of causation.
-
-### Investigation report
-
-The versioned responder-facing projection of an investigation. It contains deterministic status and summary information, evidence, timeline, source health and request state, links, AI synthesis status and output, causal events, and recurrence context.
-
-The report is the primary wire contract shared by the API, web client, Slack publishing, persistence, and demo mode. Contract changes must remain backwards-compatible with older persisted reports unless an explicit migration is provided.
-
-### Investigation report transition
-
-A committed move from one investigation report version to the next. Persistence establishes the monotonically increasing version before the matching live update is published; a stale transition must fail rather than replace a newer report.
-
-### Live investigation session
-
-The web client's version-monotonic view of one investigation report across initial retrieval, live updates, reconnects, and polling fallback. A stale or out-of-order response cannot replace a newer report, and failed live reconnection restores polling.
-
-### AI synthesis
-
-A required, evidence-grounded interpretation attempted from a bounded digest of collected evidence. LiteLLM failure is represented explicitly and must not suppress the deterministic report. It may summarize evidence, rank supported diagnoses, record unknowns, and recommend verification checks.
-
-The digest uses exact-ID deduplication and ranked source diversity by default. Narrow template compression is applied only when the exact digest would exceed its configured input limit, and only to repetitive VictoriaLogs samples and repeated Nomad allocation failures. Failed pipeline steps, first-error anchors, metrics, change evidence, and code-bearing findings remain independently citable.
-
-AI synthesis must not determine incident identity, fingerprint equality, problem-group association, or lifecycle state. Only evidence IDs, code-reference IDs, and summary references actually serialized into the bounded digest may be returned; unknown or budget-omitted identifiers are discarded rather than trusted. Model response envelopes are streamed under a strict byte limit.
-
-### Fingerprint
-
-A deterministic, versioned representation of stable incident features. Dynamic IDs, counts, timestamps, secrets, and unbounded raw evidence must not influence identity.
-
-- A **provisional fingerprint** uses the PagerDuty incident and stable labels before evidence collection completes. It may suggest historical matches.
-- A **final fingerprint** incorporates the complete accumulated evidence set and is authoritative when evidence collection is enabled.
-- A **family fingerprint** groups incidents with the same stable failure family.
-- An **exact fingerprint** represents the strongest deterministic equality signal within an algorithm version.
-
-Fingerprint algorithm versions are isolated. Different versions must not silently compare as exact matches.
-
-### Recurrence
-
-The process of comparing an incident fingerprint with historical candidates and associating the incident with a persistent problem group. Matching must be deterministic and explainable through a match type, score, and matched features.
-
-Recurrence failure must not prevent the main investigation report from being saved. The report records recurrence as unavailable with a bounded diagnostic.
-
-Concurrent association decisions within one fingerprint algorithm, service, and profile must be equivalent to some serial ordering of the same decisions.
-
-### Problem group
-
-A persistent grouping of recurring incidents that share a deterministic failure identity. A problem group has a human-readable problem key, algorithm version, representative fingerprint, occurrence history, and lifecycle state.
-
-Problem lifecycle is new, ongoing, resolved, regressed, or escalating. Lifecycle derives from persisted occurrences and incident states, not from AI synthesis.
-
-### Durable work item
-
-Persisted work that runs or repeats an investigation. Work items are leased, retried after failure, and completed idempotently where possible.
-
-### Outbox item
-
-Persisted publication work, currently used for Slack report updates. Report persistence and outbox creation occur together so publication can be retried without losing the committed report.
-
-### Slack report publication
-
-A durable intent to refresh an incident's single Slack message from the latest committed investigation report. Delivery is at-least-once: a returned Slack timestamp confirms creation and identifies repeatable updates, while an initial post whose response is lost may be retried. A delayed stuck check applies only while its originating report version remains current and collecting.
-
-### Slack prompt admission
-
-The bounded decision that an eligible Slack app mention may enter the prompt-investigation queue. Admission owns mention eligibility, normalization, duplicate suppression, rate limits, and overload outcome; Socket Mode acknowledgement remains transport work.
-
-### Demo mode
-
-A self-contained adapter used to demonstrate the live report experience without PostgreSQL, external evidence systems, or recurrence persistence. Demo reports should remain representative of production contracts and responder concepts rather than define separate product behavior.
-
-A **Demo replay** is one generation of staged investigation report transitions in Demo mode. A reset starts a newer generation, and transitions from an older generation cannot overwrite it.
-
-## System invariants
-
-1. An accepted PagerDuty event is processed idempotently.
-2. Evidence collection is bounded by configured time, item, and byte limits.
-3. External content is untrusted and cannot supply instructions to AI synthesis.
-4. A connector, recurrence, or synthesis failure does not suppress the deterministic report.
-5. Report versions increase monotonically; stale updates must not replace newer reports.
-6. Fingerprinting and problem-group association are deterministic and independent of LLM output.
-7. Secrets and authentication material never enter retained evidence or fingerprint features.
-8. Slack publication is retriable through the outbox.
-9. Demo mode preserves the production report contract.
-10. Retention may delete full incident evidence before compact fingerprint and problem history.
-
-## Current architecture map
-
-- `IncidentBot.Api/Incidents` — incident intake endpoints, investigation orchestration, progression policy, report projection, live updates, Slack publication, and durable workers.
-- `IncidentBot.Api/Connectors` — the evidence-source registry plus native and MCP evidence adapters.
-- `IncidentBot.Api/Fingerprinting` — the recurrence interface, deterministic feature extraction, normalization, generation, matching, graceful degradation, and problem persistence.
-- `IncidentBot.Api/Infrastructure` — PostgreSQL schema initialization, incident/report persistence, durable queues, and deployment readiness.
-- `IncidentBot.Api/Profiles` — investigation profile models, loading, selection, and validation.
-- `IncidentBot.Kafka` — the shared Kafka metric-pack, safe rendering, discovery, dashboard generation, and offline coverage-validation module.
-- `tools/IncidentBot.KafkaOnboarding` — the small offline CLI adapter over the shared Kafka onboarding interface.
-- `IncidentBot.Api/Domain` — shared domain records used by investigation, persistence, and wire output.
-- `IncidentBot.Api/Demo` — self-contained demo adapters and staged report data.
-- `IncidentBot.Client` — live investigation report client and SignalR session handling.
-
-## Established architecture seams
-
-- `IncidentProgression` owns investigation status names and responder-visible progression decisions while persisted reports retain backwards-compatible string values.
-- `IIncidentIntake` is the shared Incident intake interface for PagerDuty adapters; it owns profile selection, safe-label filtering, and durable acceptance ordering.
-- `EvidenceSourceRegistry` owns the six-source roster, application transport lookup, connector registration, and profile-enabled source selection. Source-specific collection remains with its adapters; profile models own only resource scope.
-- `ConnectorResponseBudget` owns fair cumulative response allocation, bounded reads, overflow classification, disposal, and diagnostics for native connector adapters.
-- `KafkaMetricPlan` is the immutable compiled interface shared by Kafka runtime collection, dashboard generation, and onboarding validation.
-- `EvidenceRankingPolicy` owns responder-facing evidence relevance, grouping, source diversity, and deterministic ordering. Report, AI, Slack, and connector truncation must use this shared policy rather than treating severity as presentation priority.
-- `InvestigationReportTransitions` owns versioned report persistence, status transitions, changed-section metadata, and matching live publication.
-- `IRecurrenceCoordinator` is the investigation workflow's recurrence interface. It owns provisional/final orchestration and unavailable-state mapping; the runner does not coordinate fingerprint construction and matching directly.
-- `RecurrencePolicy` owns candidate ranking, association thresholds, problem keys, time cutoffs, and lifecycle classification. PostgreSQL persistence owns locking and storage.
-- `IIncidentStore` is the domain-facing incident persistence interface. Intake, investigation, Slack, retention, and report reading do not depend on the PostgreSQL implementation.
-- `IncidentBot.Contracts` is the authoritative report wire contract. OpenAPI generation and generated TypeScript types keep the client representation aligned.
-- `liveInvestigationSession.ts` owns the client's version-monotonic report state, live join and reconnect behavior, polling fallback, request ordering, and cleanup behind a browser adapter.
-- `SlackPromptAdmission` owns Slack mention eligibility, normalization, duplicate suppression, rate budgets, and bounded queue outcomes while the Socket Mode adapter retains acknowledgement and transport work.
-- `DemoReplay` owns Demo reset generations, staged phase transitions, changed-section metadata, and ordered live publication behind the HTTP, PagerDuty, and hosted-worker adapters.
-- Client modules are organized by feature. `App.tsx` only selects the landing or incident feature; the incident page owns live-session orchestration, while report modules own responder-concept derivation and rendering for recurrence, evidence review, and analysis.
-
-## Remaining architectural friction
-
-These are observations, not accepted decisions:
-
-- Demo mode intentionally constructs staged report snapshots rather than simulating production connector inputs; see `docs/adr/0001-demo-mode-is-a-staged-report-adapter.md`.
-
-Use an ADR when resolving one of these points if the chosen direction is non-obvious, constrains future work, or rejects a plausible alternative.
+**Demo replay**:
+One generation of staged Case File transitions in Demo mode. A reset starts a newer generation, and transitions from an older generation cannot overwrite it.

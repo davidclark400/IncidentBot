@@ -1,0 +1,16 @@
+version: 3
+revision: "kafka-fixture.1"
+fallbackSlackChannel: "#panko-fixture"
+
+recipes:
+  - id: kafka-synthetic-fixture
+    pagerDutyServiceId: PKAFKAFIXTURE
+    team: platform
+    slackChannel: "#panko-fixture"
+    kafka:
+      metricPackId: synthetic-fixture-kafka-v1
+      cluster: fixture-cluster
+      topics:
+        - fixture-orders
+      consumerGroups:
+        - fixture-workers

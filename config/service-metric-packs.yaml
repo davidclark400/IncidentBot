@@ -1,0 +1,58 @@
+version: 1
+
+# This pack describes the repository's example payments telemetry. Onboard a real service only
+# from its reviewed dashboards, alert/recording rules, metric labels, datasource UID, and SLOs.
+packs:
+  - id: example-prometheus-http-v1
+    title: Example Prometheus request-service metrics
+    contract: request-driven-v1
+    metrics:
+      - id: request-rate
+        title: Request rate
+        role: traffic
+        promQl: 'sum(rate(http_requests_total{service=~"{{serviceRegex}}",environment=~"{{environmentRegex}}"}[5m]))'
+        datasourceUid: prometheus-production
+        unit: requests/second
+        timeReducer: maximum
+        crumbMode: context
+        requirement: required
+        dashboardRow: Overview
+      - id: http-5xx-rate
+        title: HTTP 5xx rate
+        role: errors
+        promQl: 'sum(rate(http_requests_total{service=~"{{serviceRegex}}",environment=~"{{environmentRegex}}",status=~"5.."}[5m]))'
+        datasourceUid: prometheus-production
+        unit: requests/second
+        timeReducer: maximum
+        crumbMode: anomaly
+        requirement: required
+        warningThreshold: 1
+        criticalThreshold: 5
+        direction: above
+        dashboardRow: Traffic
+      - id: latency-p99
+        title: p99 latency
+        role: latency
+        promQl: 'histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{service=~"{{serviceRegex}}",environment=~"{{environmentRegex}}"}[5m])))'
+        datasourceUid: prometheus-production
+        unit: seconds
+        timeReducer: maximum
+        crumbMode: anomaly
+        requirement: required
+        warningThreshold: 1.5
+        criticalThreshold: 3
+        direction: above
+        dashboardRow: Traffic
+      - id: availability
+        title: Service availability
+        role: availability
+        promQl: 'min(up{service=~"{{serviceRegex}}",environment=~"{{environmentRegex}}"})'
+        datasourceUid: prometheus-production
+        unit: ratio
+        timeReducer: minimum
+        crumbMode: anomaly
+        requirement: required
+        warningThreshold: 0.999
+        criticalThreshold: 0
+        direction: below
+        dashboardRow: Availability

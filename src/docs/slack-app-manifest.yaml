@@ -2,11 +2,11 @@ _metadata:
   major_version: 1
 
 display_information:
-  name: IncidentBot
+  name: Panko
 
 features:
   bot_user:
-    display_name: IncidentBot
+    display_name: Panko
     always_online: false
 
 oauth_config:

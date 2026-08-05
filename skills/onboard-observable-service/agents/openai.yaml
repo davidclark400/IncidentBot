@@ -1,0 +1,4 @@
+interface:
+  display_name: "Onboard Observable Service"
+  short_description: "Discover telemetry and build service dashboards"
+  default_prompt: "Use $onboard-observable-service to inspect authorized telemetry, select or create a metric pack, and generate the service dashboard."

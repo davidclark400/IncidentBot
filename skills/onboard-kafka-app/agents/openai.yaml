@@ -1,4 +1,4 @@
 interface:
   display_name: "Onboard Kafka Application"
-  short_description: "Discover Kafka usage and configure IncidentBot"
-  default_prompt: "Use $onboard-kafka-app to scan this application and add its Kafka resources to IncidentBot."
+  short_description: "Discover Kafka usage and configure Panko"
+  default_prompt: "Use $onboard-kafka-app to scan this application and add its Kafka resources to Panko."
